@@ -45,11 +45,41 @@ def _bar(current: float, target: float, width: int = 20) -> str:
     return f"[{'#' * filled}{'-' * (width - filled)}] {pct*100:.1f}%"
 
 
+def _yt_videos_posted_in_window(days: int) -> int:
+    """Counts videos actually posted/scheduled to YouTube within the window,
+    from post_log.json -- youtube_api.get_channel_stats()'s videoCount is a
+    lifetime total, not a rolling window. Comparing lifetime count against
+    YT_ENTRY_VIDEOS_90D silently defeats that threshold's purpose: a channel
+    that posted 3 videos once, long ago, and has been dormant since would
+    still read as "active enough" forever."""
+    if not os.path.exists(POST_LOG_FILE):
+        return 0
+    with open(POST_LOG_FILE) as f:
+        post_log = json.load(f)
+    cutoff = datetime.now(timezone.utc).timestamp() - days * 86400
+    count = 0
+    for entry in post_log:
+        yt = entry.get("platforms", {}).get("youtube", {})
+        if yt.get("status") not in ("live", "scheduled"):
+            continue
+        ts_str = yt.get("scheduled_for") or entry.get("posted_at")
+        if not ts_str:
+            continue
+        try:
+            ts = datetime.fromisoformat(ts_str.replace("Z", "+00:00")).timestamp()
+        except Exception:
+            continue
+        if ts >= cutoff:
+            count += 1
+    return count
+
+
 def check_youtube() -> str:
     stats = youtube_api.get_channel_stats()
     subs = int(stats.get("subscriberCount", 0))
     total_views = int(stats.get("viewCount", 0))
     video_count = int(stats.get("videoCount", 0))
+    videos_90d = _yt_videos_posted_in_window(90)
 
     try:
         watch_minutes_365 = youtube_api.get_watch_minutes(365)
@@ -66,7 +96,7 @@ def check_youtube() -> str:
 
     entry_ready = (
         subs >= YT_ENTRY_SUBS
-        and video_count >= YT_ENTRY_VIDEOS_90D
+        and videos_90d >= YT_ENTRY_VIDEOS_90D
         and (watch_hours_365 >= YT_ENTRY_WATCH_HOURS_365D or views_90 >= YT_ENTRY_SHORTS_VIEWS_90D)
     )
     full_ready = (
@@ -78,6 +108,7 @@ def check_youtube() -> str:
         "## YouTube",
         f"- Subscribers: {subs} / {YT_FULL_SUBS} — {_bar(subs, YT_FULL_SUBS)}",
         f"- Total lifetime views: {total_views:,} ({video_count} videos)",
+        f"- Videos posted (90d): {videos_90d} / {YT_ENTRY_VIDEOS_90D}",
         f"- Watch hours (365d): {watch_hours_365:.1f} / {YT_FULL_WATCH_HOURS_365D} — {_bar(watch_hours_365, YT_FULL_WATCH_HOURS_365D)}",
         f"- Views (90d, Shorts-path proxy): {views_90:,} / {YT_FULL_SHORTS_VIEWS_90D:,} — {_bar(views_90, YT_FULL_SHORTS_VIEWS_90D)}",
         "",
