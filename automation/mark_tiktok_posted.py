@@ -11,12 +11,11 @@ fix: it's what makes "live" mean "actually confirmed posted."
 
 Usage: uv run python automation/mark_tiktok_posted.py <video_path>
 """
-import json
 import sys
 from datetime import datetime, timezone
 
-BASE_DIR = "/Users/geniusbeats/MoneyPrinterTurbo"
-POST_LOG_FILE = f"{BASE_DIR}/automation/post_log.json"
+sys.path.insert(0, "/Users/geniusbeats/MoneyPrinterTurbo")
+from automation.post_log_lock import locked_post_log  # noqa: E402
 
 
 def main():
@@ -25,27 +24,27 @@ def main():
         sys.exit(1)
 
     video_path = sys.argv[1]
-    with open(POST_LOG_FILE) as f:
-        entries = json.load(f)
 
-    match = None
-    for entry in entries:
-        if entry.get("video_path") == video_path:
-            match = entry
-            break
+    # Everything happens inside the lock: this task runs on its own fixed
+    # schedule, independent of daily_pipeline.py's (potentially 30-90+
+    # minute) run, so the file could be mid-write when this fires.
+    with locked_post_log() as entries:
+        match = None
+        for entry in entries:
+            if entry.get("video_path") == video_path:
+                match = entry
+                break
 
-    if match is None:
-        print(f"No post_log entry found with video_path == {video_path!r}", file=sys.stderr)
-        sys.exit(1)
+        if match is None:
+            print(f"No post_log entry found with video_path == {video_path!r}", file=sys.stderr)
+            sys.exit(1)
 
-    tt = match.setdefault("platforms", {}).setdefault("tiktok", {})
-    tt["status"] = "live"
-    tt["posted_at"] = datetime.now(timezone.utc).isoformat()
+        tt = match.setdefault("platforms", {}).setdefault("tiktok", {})
+        tt["status"] = "live"
+        tt["posted_at"] = datetime.now(timezone.utc).isoformat()
+        title = match.get("title", match.get("subject", video_path))
 
-    with open(POST_LOG_FILE, "w") as f:
-        json.dump(entries, f, indent=2)
-
-    print(f"Marked TikTok live for: {match.get('title', match.get('subject', video_path))!r}")
+    print(f"Marked TikTok live for: {title!r}")
 
 
 if __name__ == "__main__":

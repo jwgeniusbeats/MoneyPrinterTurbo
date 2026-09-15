@@ -15,21 +15,11 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, BASE_DIR)
 
 from app.services import instagram_api, meta_api, youtube_api  # noqa: E402
+from automation.post_log_lock import locked_post_log  # noqa: E402
 
-POST_LOG_FILE = os.path.join(BASE_DIR, "automation", "post_log.json")
 LEARNINGS_FILE = os.path.join(BASE_DIR, "automation", "learnings.md")
 
 MIN_VIDEOS_FOR_LEARNINGS = 5
-
-
-def load_post_log() -> list:
-    with open(POST_LOG_FILE) as f:
-        return json.load(f)
-
-
-def save_post_log(entries: list):
-    with open(POST_LOG_FILE, "w") as f:
-        json.dump(entries, f, indent=2)
 
 
 def refresh_youtube_stats(entries: list) -> list:
@@ -132,7 +122,11 @@ def write_learnings(entries: list):
 
     scored.sort(key=_score, reverse=True)
     top = scored[:5]
-    bottom = scored[-3:]
+    # Only show a "lowest performing" section once top/bottom can't overlap --
+    # with fewer than 8 scored videos, the same video would show up as both a
+    # top and a bottom performer, giving the LLM prompt self-contradicting
+    # guidance (emulate and avoid the same topic at once).
+    bottom = scored[-3:] if len(scored) >= 8 else []
 
     def _fmt(e: dict) -> str:
         yt = e.get("platforms", {}).get("youtube", {})
@@ -164,10 +158,11 @@ def write_learnings(entries: list):
     lines.append("## Top performing topics (ranked by YT watch-through %, falls back to YT views, then total cross-platform views)")
     for e in top:
         lines.append(_fmt(e))
-    lines.append("")
-    lines.append("## Lowest performing topics (avoid repeating this angle)")
-    for e in bottom:
-        lines.append(_fmt(e))
+    if bottom:
+        lines.append("")
+        lines.append("## Lowest performing topics (avoid repeating this angle)")
+        for e in bottom:
+            lines.append(_fmt(e))
 
     tagged = [e for e in scored if e.get("category")]
     if tagged:
@@ -201,15 +196,15 @@ def write_learnings(entries: list):
 
 
 def main():
-    entries = load_post_log()
-    if not entries:
-        print("post_log.json empty, nothing to analyze.")
-        return
-    entries = refresh_youtube_stats(entries)
-    entries = refresh_facebook_stats(entries)
-    entries = refresh_instagram_stats(entries)
-    save_post_log(entries)
-    write_learnings(entries)
+    with locked_post_log() as entries:
+        if not entries:
+            print("post_log.json empty, nothing to analyze.")
+            return
+        refresh_youtube_stats(entries)
+        refresh_facebook_stats(entries)
+        refresh_instagram_stats(entries)
+        learnings_input = list(entries)
+    write_learnings(learnings_input)
 
 
 if __name__ == "__main__":

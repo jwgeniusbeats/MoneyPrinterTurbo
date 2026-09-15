@@ -19,7 +19,7 @@ import os
 import subprocess
 import sys
 import tempfile
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, BASE_DIR)
@@ -33,7 +33,6 @@ from automation.daily_pipeline import (  # noqa: E402
 
 POST_LOG_FILE = os.path.join(BASE_DIR, "automation", "post_log.json")
 COMPILATION_LOG_FILE = os.path.join(BASE_DIR, "automation", "compilation_log.json")
-LOOKBACK_DAYS = 7
 MIN_CLIPS = 3
 MAX_CLIPS = 8
 
@@ -58,7 +57,13 @@ def save_compilation_log(entries: list):
 
 
 def pick_clips(post_log: list, already_used: set) -> list:
-    cutoff = datetime.now(timezone.utc) - timedelta(days=LOOKBACK_DAYS)
+    # No age cutoff: at VIDEOS_PER_RUN=4/day (~28/week) but MAX_CLIPS=8/run,
+    # a rolling 7-day window would let most clips age out of every run's
+    # lookback before ever being picked, silently dropping them from the
+    # watch-hour compilation forever. Instead, pick from ALL not-yet-used
+    # clips (already_used, from compilation_log.json, is what actually
+    # prevents repeats) -- oldest first, so nothing waits indefinitely and
+    # any backlog just rolls over to next week's run instead of vanishing.
     candidates = []
     for entry in post_log:
         if entry["task_id"] in already_used:
@@ -66,12 +71,7 @@ def pick_clips(post_log: list, already_used: set) -> list:
         video_path = entry.get("video_path")
         if not video_path or not os.path.exists(video_path):
             continue
-        try:
-            posted_at = datetime.fromisoformat(entry["posted_at"].replace("Z", "+00:00"))
-        except Exception:
-            continue
-        if posted_at >= cutoff:
-            candidates.append(entry)
+        candidates.append(entry)
     candidates.sort(key=lambda e: e["posted_at"])
     return candidates[:MAX_CLIPS]
 
@@ -132,7 +132,7 @@ def main():
 
     clips = pick_clips(post_log, already_used)
     if len(clips) < MIN_CLIPS:
-        print(f"Only {len(clips)} unused clip(s) from the last {LOOKBACK_DAYS} days "
+        print(f"Only {len(clips)} unused clip(s) total "
               f"(need {MIN_CLIPS}+), skipping this week's compilation.")
         return
 

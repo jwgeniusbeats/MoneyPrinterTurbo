@@ -110,8 +110,14 @@ def check_tiktok() -> str:
             if "views" not in tt:
                 continue
             try:
+                # Use TikTok's own posted_at (set by mark_tiktok_posted.py when
+                # the post actually goes live) rather than the top-level
+                # posted_at (video-generation time) -- these can diverge by
+                # days if the TikTok posting queue backs up, which would
+                # otherwise skew this 30-day window.
+                tiktok_posted_at = tt.get("posted_at") or entry["posted_at"]
                 posted_ts = datetime.fromisoformat(
-                    entry["posted_at"].replace("Z", "+00:00")
+                    tiktok_posted_at.replace("Z", "+00:00")
                 ).timestamp()
             except Exception:
                 continue

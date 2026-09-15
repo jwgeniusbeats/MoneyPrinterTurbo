@@ -49,3 +49,4 @@ secrets/
 
 # Generated output, not source
 Videos/
+automation/post_log.json.lock

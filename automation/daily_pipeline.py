@@ -25,6 +25,7 @@ sys.path.insert(0, BASE_DIR)
 
 from app.services import instagram_api, llm, meta_api, youtube_api  # noqa: E402
 from app.utils import utils  # noqa: E402
+from automation.post_log_lock import locked_post_log  # noqa: E402
 
 BACKLOG_FILE = os.path.join(BASE_DIR, "automation", "topic_backlog.json")
 STATE_FILE = os.path.join(BASE_DIR, "automation", "schedule_state.json")
@@ -223,6 +224,7 @@ def run_batch(topics: list) -> list:
             succeeded.append(
                 {
                     "task_id": r.get("task_id") or task.get("task_id"),
+                    "topic_index": task["index"] - 1,
                     "video_subject": topics[task["index"] - 1],
                     "script": r["script"],
                     "final_video": r["videos"][0],
@@ -368,7 +370,19 @@ def retry_failed_platforms(post_log: list):
                 print(f"Retry still failing: Instagram for {title!r}: {e}")
 
     if any_retried:
-        save_post_log(post_log)
+        # Merge into a freshly-read copy under lock instead of overwriting
+        # with this possibly-stale in-memory list -- retrying involves slow
+        # network calls, during which the concurrent tiktok-daily-post task
+        # (running on its own fixed schedule, independent of this run) could
+        # have appended or updated other entries via mark_tiktok_posted.py.
+        retried_platforms_by_task_id = {
+            e["task_id"]: e["platforms"] for e in post_log if e.get("task_id")
+        }
+        with locked_post_log() as fresh_log:
+            for entry in fresh_log:
+                tid = entry.get("task_id")
+                if tid in retried_platforms_by_task_id:
+                    entry["platforms"] = retried_platforms_by_task_id[tid]
 
 
 def main():
@@ -386,8 +400,14 @@ def main():
     finished = run_batch(topics)
     print(f"{len(finished)}/{len(topics)} videos finished successfully.")
 
-    used_topics = {t["video_subject"] for t in finished}
-    remaining_backlog = [t for t in backlog if t not in used_topics] or remaining
+    # Remove finished topics by position within `topics`, not by string value:
+    # two identical topic strings in the backlog (plausible -- LLM-brainstormed
+    # refills are only checked against the last 30 existing topics, not the
+    # full history) would otherwise both get silently removed by a set-based
+    # match even when only one was actually turned into a video.
+    finished_indices = {t["topic_index"] for t in finished}
+    unfinished_this_run = [t for i, t in enumerate(topics) if i not in finished_indices]
+    remaining_backlog = unfinished_this_run + remaining
 
     if len(remaining_backlog) < BACKLOG_REFILL_THRESHOLD:
         try:
@@ -498,8 +518,13 @@ def main():
             log_entry["platforms"]["instagram"] = {"status": "failed", "error": str(e)}
 
         log_entry["platforms"]["tiktok"] = {"status": "pending_manual"}
-        post_log.append(log_entry)
-        save_post_log(post_log)
+        # Append under lock against a freshly-read copy, not the in-memory
+        # `post_log` loaded once at the top of main() -- a full run can span
+        # 30-90+ minutes across several videos' platform uploads, plenty of
+        # time for a concurrent tiktok-daily-post run to have appended or
+        # updated other entries in the meantime.
+        with locked_post_log() as fresh_log:
+            fresh_log.append(log_entry)
 
         manual_lines.append(
             f"=== {title} ===\nFile: {labeled_path}\nCaption:\n{description}\n"
