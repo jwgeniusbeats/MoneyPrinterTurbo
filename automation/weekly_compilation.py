@@ -1,7 +1,7 @@
 """
-Bundles the last 7 days of shorts into one long-form YouTube video
-("5 Psychology Facts That Will Blow Your Mind") and uploads it as a normal
-(non-Shorts) video.
+Bundles up to MAX_CLIPS not-yet-used shorts (oldest first, no age cutoff --
+see pick_clips()) into one long-form YouTube video ("5 Psychology Facts That
+Will Blow Your Mind") and uploads it as a normal (non-Shorts) video.
 
 Why: YouTube Shorts monetization needs 10M Shorts views in 90 days — a very
 high bar for a new channel. Long-form monetization needs 4,000 watch HOURS
