@@ -1816,10 +1816,18 @@ def prepend_title_card(
             clip.audio.subclipped(0, card_duration) if clip.audio is not None else None
         )
 
-        rest_clip = clip.subclipped(card_duration, clip.duration)
-        combined = concatenate_videoclips(
-            [opening_composite, rest_clip], method="compose"
-        )
+        # subclipped() raises when start_time >= duration (a strict check, not
+        # a rare float-precision edge case) -- for any video whose duration is
+        # <= card_duration (e.g. shorter than the configured title-card
+        # length), card_duration == clip.duration exactly and there is no
+        # "rest" to concatenate; just use the title-card composite as-is.
+        if card_duration < clip.duration:
+            rest_clip = clip.subclipped(card_duration, clip.duration)
+            combined = concatenate_videoclips(
+                [opening_composite, rest_clip], method="compose"
+            )
+        else:
+            combined = opening_composite
         _write_videofile_with_codec_fallback(
             combined,
             output_file=tmp_output,
