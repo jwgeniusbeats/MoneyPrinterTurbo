@@ -9,10 +9,10 @@
         "id": "4gtZLyP6yXA",
         "status": "live",
         "posted_at": "2026-09-14T14:46:29Z",
-        "views": 5,
+        "views": 8,
         "likes": 0,
         "comments": 0,
-        "stats_fetched_at": "2026-09-14T23:57:52.377515+00:00",
+        "stats_fetched_at": "2026-09-15T08:32:12.679517+00:00",
         "avg_view_duration_sec": 0,
         "avg_view_percentage": 0
       },
@@ -22,15 +22,15 @@
         "views": 2,
         "likes": 0,
         "comments": 0,
-        "stats_fetched_at": "2026-09-14T23:57:54.720211+00:00"
+        "stats_fetched_at": "2026-09-15T08:32:17.727614+00:00"
       },
       "instagram": {
         "id": "18134300641729141",
         "status": "live",
-        "views": 56,
+        "views": 57,
         "likes": 0,
         "comments": 0,
-        "stats_fetched_at": "2026-09-14T23:57:56.339637+00:00"
+        "stats_fetched_at": "2026-09-15T08:32:22.326016+00:00"
       },
       "tiktok": {
         "status": "live",
@@ -49,10 +49,10 @@
         "id": "l4RLwtrDfFE",
         "status": "live",
         "posted_at": "2026-09-14T14:46:45Z",
-        "views": 1,
+        "views": 2,
         "likes": 0,
         "comments": 0,
-        "stats_fetched_at": "2026-09-14T23:57:52.697215+00:00",
+        "stats_fetched_at": "2026-09-15T08:32:13.169114+00:00",
         "avg_view_duration_sec": 0,
         "avg_view_percentage": 0
       },
@@ -62,7 +62,7 @@
         "views": 2,
         "likes": 0,
         "comments": 0,
-        "stats_fetched_at": "2026-09-14T23:57:55.114752+00:00"
+        "stats_fetched_at": "2026-09-15T08:32:18.243742+00:00"
       },
       "instagram": {
         "id": "17974410959932919",
@@ -70,7 +70,7 @@
         "views": 0,
         "likes": 0,
         "comments": 0,
-        "stats_fetched_at": "2026-09-14T23:57:56.543082+00:00"
+        "stats_fetched_at": "2026-09-15T08:32:22.576263+00:00"
       },
       "tiktok": {
         "status": "live",
@@ -89,10 +89,10 @@
         "id": "WVvWBq7_XnA",
         "status": "live",
         "posted_at": "2026-09-14T14:47:00Z",
-        "views": 3,
+        "views": 7,
         "likes": 0,
         "comments": 0,
-        "stats_fetched_at": "2026-09-14T23:57:52.988338+00:00",
+        "stats_fetched_at": "2026-09-15T08:32:13.506176+00:00",
         "avg_view_duration_sec": 0,
         "avg_view_percentage": 0
       },
@@ -102,7 +102,7 @@
         "views": 1,
         "likes": 0,
         "comments": 0,
-        "stats_fetched_at": "2026-09-14T23:57:55.792802+00:00"
+        "stats_fetched_at": "2026-09-15T08:32:18.961146+00:00"
       },
       "instagram": {
         "id": "17902926717577411",
@@ -110,7 +110,7 @@
         "views": 0,
         "likes": 0,
         "comments": 0,
-        "stats_fetched_at": "2026-09-14T23:57:56.674271+00:00"
+        "stats_fetched_at": "2026-09-15T08:32:22.951224+00:00"
       },
       "tiktok": {
         "status": "live",
@@ -134,7 +134,7 @@
         "views": 1,
         "likes": 0,
         "comments": 0,
-        "stats_fetched_at": "2026-09-14T23:57:53.270402+00:00",
+        "stats_fetched_at": "2026-09-15T08:32:13.875107+00:00",
         "avg_view_duration_sec": 0,
         "avg_view_percentage": 0
       },
@@ -144,15 +144,15 @@
         "views": 1,
         "likes": 0,
         "comments": 0,
-        "stats_fetched_at": "2026-09-14T23:57:56.135725+00:00"
+        "stats_fetched_at": "2026-09-15T08:32:20.001547+00:00"
       },
       "instagram": {
         "id": "17983484049082701",
         "status": "live",
-        "views": 0,
+        "views": 14,
         "likes": 0,
         "comments": 0,
-        "stats_fetched_at": "2026-09-14T23:57:56.806873+00:00"
+        "stats_fetched_at": "2026-09-15T08:32:23.338419+00:00"
       },
       "tiktok": {
         "status": "live",
@@ -162,5 +162,191 @@
       }
     },
     "video_path": "/Users/geniusbeats/MoneyPrinterTurbo/Videos/2026-09-14_100835_the-bystander-effect-why-more-people-around-you-means-less-h_8a2055e0/the-bystander-effect-why-more-people-around-you-means-less-h-1.mp4"
+  },
+  {
+    "task_id": "76af4bfe-1319-4e42-bbb3-da84b35585c4",
+    "subject": "The Dunning-Kruger effect: why the least skilled people are the most confident.",
+    "posted_at": "2026-09-15T08:08:25.281343+00:00",
+    "platforms": {
+      "youtube": {
+        "id": "ZV_6F5L-3nk",
+        "status": "scheduled",
+        "scheduled_for": "2026-09-18T06:00:00Z",
+        "views": 0,
+        "likes": 0,
+        "comments": 0,
+        "stats_fetched_at": "2026-09-15T08:32:14.187559+00:00",
+        "avg_view_duration_sec": 0,
+        "avg_view_percentage": 0
+      },
+      "facebook": {
+        "id": "929988966394666",
+        "status": "scheduled",
+        "scheduled_for": "2026-09-18T06:00:00Z",
+        "views": 0,
+        "likes": 0,
+        "comments": 0,
+        "stats_fetched_at": "2026-09-15T08:32:20.916410+00:00"
+      },
+      "instagram": {
+        "id": "18070599689736626",
+        "status": "live",
+        "views": 0,
+        "likes": 0,
+        "comments": 0,
+        "stats_fetched_at": "2026-09-15T08:32:23.617952+00:00"
+      },
+      "tiktok": {
+        "status": "pending_manual"
+      }
+    },
+    "title": "Why beginners think they know EVERYTHING \ud83e\udd2f",
+    "category": "general",
+    "hook_type": "why_hook",
+    "video_path": "/Users/geniusbeats/MoneyPrinterTurbo/Videos/2026-09-15_100836_the-dunning-kruger-effect-why-the-least-skilled-people-are-t_76af4bfe/the-dunning-kruger-effect-why-the-least-skilled-people-are-t-1.mp4",
+    "description": "Have you ever noticed that the least skilled person in the room is often the most confident? That is the Dunning-Kruger effect in action! When you first start learning something, you lack the knowledge to realize how much you do not know, leading to an irrational peak in confidence. Real expertise only comes after you realize how much learning lies ahead. Have you ever caught yourself falling for this illusion? Drop a comment below!\n\n\ud83d\udd17 More facts + early access: tinyurl.com/238zsuaa\n\n#DunningKruger #PsychologyFacts #SelfImprovement #MindsetShift #LearnOnTikTok"
+  },
+  {
+    "task_id": "c073ea19-8feb-4c12-ab4e-33c0e81865f7",
+    "subject": "Why nostalgia feels so good: the psychology of missing the past.",
+    "posted_at": "2026-09-15T08:09:47.742333+00:00",
+    "platforms": {
+      "youtube": {
+        "id": "hjeqOv5_PuE",
+        "status": "scheduled",
+        "scheduled_for": "2026-09-18T10:00:00Z",
+        "views": 0,
+        "likes": 0,
+        "comments": 0,
+        "stats_fetched_at": "2026-09-15T08:32:14.577970+00:00",
+        "avg_view_duration_sec": 0,
+        "avg_view_percentage": 0
+      },
+      "facebook": {
+        "id": "917132684432881",
+        "status": "scheduled",
+        "scheduled_for": "2026-09-18T10:00:00Z",
+        "views": 0,
+        "likes": 0,
+        "comments": 0,
+        "stats_fetched_at": "2026-09-15T08:32:21.783738+00:00"
+      },
+      "instagram": {
+        "id": "17863458444678116",
+        "status": "live",
+        "views": 0,
+        "likes": 0,
+        "comments": 0,
+        "stats_fetched_at": "2026-09-15T08:32:23.882663+00:00"
+      },
+      "tiktok": {
+        "status": "pending_manual"
+      }
+    },
+    "title": "The REAL reason nostalgia feels so good... \ud83e\udde0\u2728",
+    "category": "general",
+    "hook_type": "curiosity_hook",
+    "video_path": "/Users/geniusbeats/MoneyPrinterTurbo/Videos/2026-09-15_100958_why-nostalgia-feels-so-good-the-psychology-of-missing-the-pa_c073ea19/why-nostalgia-feels-so-good-the-psychology-of-missing-the-pa-1.mp4",
+    "description": "Have you ever wondered why listening to a song from your childhood or playing an old video game instantly puts a smile on your face? It turns out nostalgia isn't just a random memory\u2014it's your brain's secret survival tool! When stress or uncertainty hits, your mind rewinds to past moments of comfort and security. This simple trip down memory lane floods your system with dopamine and serotonin, instantly lowering stress and helping you feel connected. Missing the past isn't a flaw; it's how your mind heals the present. What's one memory that instantly brings you comfort? Tell us in the comments!\n\n\ud83d\udd17 More facts + early access: tinyurl.com/238zsuaa\n\n#psychology #nostalgia #mentalhealth #brainfacts #learnontiktok"
+  },
+  {
+    "task_id": "e2a97bf7",
+    "subject": "3 psychological tricks that make you buy things you don't need",
+    "title": "3 Psychological Tricks Stores Use to Hack Your Brain",
+    "posted_at": "2026-09-12T21:16:11Z",
+    "video_path": "/Users/geniusbeats/MoneyPrinterTurbo/Videos/2026-09-12_190911_3-psychological-tricks-that-make-you-buy-things-you-don-t-ne_e2a97bf7/3-psychological-tricks-that-make-you-buy-things-you-don-t-ne-1.mp4",
+    "description": "",
+    "platforms": {
+      "youtube": {
+        "id": "wOo6UEFOlXI",
+        "status": "live",
+        "views": 6,
+        "likes": 0,
+        "comments": 0,
+        "stats_fetched_at": "2026-09-15T08:32:15.010261+00:00",
+        "avg_view_duration_sec": 27,
+        "avg_view_percentage": 67.97
+      }
+    }
+  },
+  {
+    "task_id": "19d3bbf9",
+    "subject": "5 signs someone is lying to you, according to psychology",
+    "title": "5 signs someone is lying to you, according to psychology",
+    "posted_at": "2026-09-14T11:00:01Z",
+    "video_path": "/Users/geniusbeats/MoneyPrinterTurbo/Videos/2026-09-13_012234_5-signs-someone-is-lying-to-you-according-to-psychology-keep_19d3bbf9/5-signs-someone-is-lying-to-you-according-to-psychology-keep-1.mp4",
+    "description": "",
+    "platforms": {
+      "youtube": {
+        "id": "4E3PkWU6zKc",
+        "status": "live",
+        "views": 167,
+        "likes": 1,
+        "comments": 0,
+        "stats_fetched_at": "2026-09-15T08:32:15.379073+00:00",
+        "avg_view_duration_sec": 0,
+        "avg_view_percentage": 0
+      }
+    }
+  },
+  {
+    "task_id": "78572538",
+    "subject": "Why you remember insults but forget compliments: the psychology of negativity bias",
+    "title": "Why you remember insults but forget compliments: the psychology of negativity bias",
+    "posted_at": "2026-09-13T00:23:15Z",
+    "video_path": "/Users/geniusbeats/MoneyPrinterTurbo/Videos/2026-09-13_012631_why-you-remember-insults-but-forget-compliments-the-psycholo_78572538/why-you-remember-insults-but-forget-compliments-the-psycholo-1.mp4",
+    "description": "",
+    "platforms": {
+      "youtube": {
+        "id": "TQfrEm0M5II",
+        "status": "live",
+        "views": 2,
+        "likes": 0,
+        "comments": 0,
+        "stats_fetched_at": "2026-09-15T08:32:15.708231+00:00",
+        "avg_view_duration_sec": 0,
+        "avg_view_percentage": 0
+      }
+    }
+  },
+  {
+    "task_id": "6c424b60",
+    "subject": "The Mandela Effect: why your brain remembers things that never happened",
+    "title": "The Mandela Effect: why your brain remembers things that never happened",
+    "posted_at": "2026-09-14T18:00:21Z",
+    "video_path": "/Users/geniusbeats/MoneyPrinterTurbo/Videos/2026-09-13_013018_the-mandela-effect-why-your-brain-remembers-things-that-neve_6c424b60/the-mandela-effect-why-your-brain-remembers-things-that-neve-1.mp4",
+    "description": "",
+    "platforms": {
+      "youtube": {
+        "id": "zuax3CzVyBU",
+        "status": "live",
+        "views": 12,
+        "likes": 0,
+        "comments": 0,
+        "stats_fetched_at": "2026-09-15T08:32:16.126512+00:00",
+        "avg_view_duration_sec": 0,
+        "avg_view_percentage": 0
+      }
+    }
+  },
+  {
+    "task_id": "44499352",
+    "subject": "3 weird psychological reasons you procrastinate, and how to actually stop",
+    "title": "3 weird psychological reasons you procrastinate, and how to actually stop",
+    "posted_at": "2026-09-13T00:23:25Z",
+    "video_path": "/Users/geniusbeats/MoneyPrinterTurbo/Videos/2026-09-13_013432_3-weird-psychological-reasons-you-procrastinate-and-how-to-a_44499352/3-weird-psychological-reasons-you-procrastinate-and-how-to-a-1.mp4",
+    "description": "",
+    "platforms": {
+      "youtube": {
+        "id": "s8QcymWTc5s",
+        "status": "live",
+        "views": 0,
+        "likes": 0,
+        "comments": 0,
+        "stats_fetched_at": "2026-09-15T08:32:16.533382+00:00",
+        "avg_view_duration_sec": 0,
+        "avg_view_percentage": 0
+      }
+    }
   }
 ]
