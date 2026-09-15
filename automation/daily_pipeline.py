@@ -576,6 +576,18 @@ def main():
             f.writelines(manual_lines)
         print(f"Manual TikTok reminders appended to {MANUAL_REMINDER_FILE}")
 
+    try:
+        # storage/tasks/ working folders (raw combined video, audio,
+        # subtitle, script.json) are never cleaned up on their own and
+        # accumulate forever -- ~27MB/task, found disk down to 4.5GB free
+        # on 2026-09-15. Runs once per day here; only deletes folders
+        # already backed up under Videos/ and at least 2 days old, so this
+        # run's own just-created folders are never touched.
+        from automation.cleanup_storage import main as cleanup_storage_main
+        cleanup_storage_main(argv=[])
+    except Exception as e:
+        print(f"Storage cleanup failed (non-fatal): {e}")
+
 
 if __name__ == "__main__":
     main()
