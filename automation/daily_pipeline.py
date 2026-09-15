@@ -163,10 +163,19 @@ def extract_and_set_thumbnail(youtube_video_id: str, video_path: str):
 
 
 def next_slot_utc(state: dict) -> datetime:
-    """Advance to the next 13:00/20:00 CET slot after the last scheduled one."""
+    """Advance to the next configured CET slot after the last scheduled one.
+
+    Anchored at max(now, last_scheduled) rather than always last_scheduled --
+    the old always-last_scheduled anchor never self-corrected, so any drift
+    (a failed upload that still reserved a slot, a run that fell behind)
+    compounded forever. Anchoring at "now" whenever the schedule has fallen
+    behind (or drifted ahead, e.g. from the account-block failures on
+    2026-09-13/14) makes it catch back up to real time instead."""
     last = datetime.fromisoformat(state["last_scheduled_utc"].replace("Z", "+00:00"))
+    now = datetime.now(timezone.utc)
+    anchor = max(last, now)
     slot_hours = sorted(state["slot_hours_cet"])
-    cet = last + timedelta(hours=CET_OFFSET_HOURS)
+    cet = anchor + timedelta(hours=CET_OFFSET_HOURS)
     for h in slot_hours:
         if h > cet.hour or (h == cet.hour and cet.minute > 0 and False):
             candidate_cet = cet.replace(hour=h, minute=0, second=0, microsecond=0)
@@ -475,8 +484,14 @@ def main():
         log_entry["video_path"] = labeled_path
         log_entry["description"] = description
 
+        # Compute the candidate slot but DON'T commit it to state yet -- only
+        # persist it once the upload that actually uses it (YouTube) succeeds.
+        # Previously this was written to state unconditionally before the
+        # upload attempt, so a failed upload still permanently burned a slot
+        # nothing ever published into -- the main cause, compounded daily,
+        # of the schedule drifting further and further ahead of real time.
         slot_dt = next_slot_utc(state)
-        state["last_scheduled_utc"] = slot_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+        candidate_scheduled_utc = slot_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
 
         try:
             yt_result = youtube_api.upload_video(
@@ -484,13 +499,14 @@ def main():
                 title=title,
                 description=description,
                 tags=seo_tags,
-                publish_at=state["last_scheduled_utc"],
+                publish_at=candidate_scheduled_utc,
             )
-            print(f"YouTube scheduled: {yt_result.get('id')} at {state['last_scheduled_utc']}")
+            state["last_scheduled_utc"] = candidate_scheduled_utc
+            print(f"YouTube scheduled: {yt_result.get('id')} at {candidate_scheduled_utc}")
             log_entry["platforms"]["youtube"] = {
                 "id": yt_result.get("id"),
                 "status": "scheduled",
-                "scheduled_for": state["last_scheduled_utc"],
+                "scheduled_for": candidate_scheduled_utc,
             }
             try:
                 extract_and_set_thumbnail(yt_result["id"], video_path)
@@ -508,11 +524,12 @@ def main():
                 description=description,
                 scheduled_publish_time=int(slot_dt.timestamp()),
             )
-            print(f"Facebook scheduled: {fb_result.get('id')} at {state['last_scheduled_utc']}")
+            state["last_scheduled_utc"] = candidate_scheduled_utc
+            print(f"Facebook scheduled: {fb_result.get('id')} at {candidate_scheduled_utc}")
             log_entry["platforms"]["facebook"] = {
                 "id": fb_result.get("id"),
                 "status": "scheduled",
-                "scheduled_for": state["last_scheduled_utc"],
+                "scheduled_for": candidate_scheduled_utc,
             }
         except Exception as e:
             print(f"Facebook upload failed for {subject}: {e}")

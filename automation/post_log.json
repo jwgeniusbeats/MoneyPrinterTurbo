@@ -171,7 +171,7 @@
       "youtube": {
         "id": "ZV_6F5L-3nk",
         "status": "scheduled",
-        "scheduled_for": "2026-09-18T06:00:00Z",
+        "scheduled_for": "2026-09-15T12:00:00Z",
         "views": 0,
         "likes": 0,
         "comments": 0,
@@ -181,8 +181,7 @@
       },
       "facebook": {
         "id": "929988966394666",
-        "status": "scheduled",
-        "scheduled_for": "2026-09-18T06:00:00Z",
+        "status": "live",
         "views": 0,
         "likes": 0,
         "comments": 0,
@@ -214,7 +213,7 @@
       "youtube": {
         "id": "hjeqOv5_PuE",
         "status": "scheduled",
-        "scheduled_for": "2026-09-18T10:00:00Z",
+        "scheduled_for": "2026-09-15T15:00:00Z",
         "views": 0,
         "likes": 0,
         "comments": 0,
@@ -224,8 +223,7 @@
       },
       "facebook": {
         "id": "917132684432881",
-        "status": "scheduled",
-        "scheduled_for": "2026-09-18T10:00:00Z",
+        "status": "live",
         "views": 0,
         "likes": 0,
         "comments": 0,

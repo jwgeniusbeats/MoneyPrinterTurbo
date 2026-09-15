@@ -1,9 +1,9 @@
 {
-  "last_scheduled_utc": "2026-09-17T18:00:00Z",
+  "last_scheduled_utc": "2026-09-15T10:50:21Z",
   "slot_hours_cet": [
-    8,
-    12,
-    16,
+    11,
+    14,
+    17,
     20
   ]
 }
