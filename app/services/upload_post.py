@@ -55,6 +55,7 @@ class UploadPostService:
         platforms: Optional[list] = None,
         privacy_level: str = "PUBLIC_TO_EVERYONE",
         youtube_extra: Optional[dict] = None,
+        description: Optional[str] = None,
     ) -> dict:
         if not self.is_configured():
             logger.warning("Upload-Post is not configured. Skipping cross-post.")
@@ -89,6 +90,8 @@ class UploadPostService:
                     ('title', title[:2200]),
                     ('privacy_level', privacy_level),
                 ]
+                if description:
+                    data.append(('description', description[:2200]))
 
                 for platform in platforms:
                     data.append(('platform[]', platform))
@@ -119,6 +122,8 @@ class UploadPostService:
                     timeout=300,
                 )
 
+                if not response.ok:
+                    logger.error(f"Upload-Post API error {response.status_code}: {response.text}")
                 response.raise_for_status()
                 result = response.json()
 
@@ -172,5 +177,8 @@ def cross_post_video(
     title: str,
     platforms: Optional[list] = None,
     youtube_extra: Optional[dict] = None,
+    description: Optional[str] = None,
 ) -> dict:
-    return upload_post_service.upload_video(video_path, title, platforms, youtube_extra=youtube_extra)
+    return upload_post_service.upload_video(
+        video_path, title, platforms, youtube_extra=youtube_extra, description=description
+    )

@@ -398,6 +398,8 @@ mimo_tts_style_prompt = "请用自然、清晰、适合短视频旁白的语气�
 # explicitly; Edge failures do not trigger an automatic Whisper model download.
 # Leave empty to skip generation.
 subtitle_provider = "edge"
+enable_title_card = true
+title_card_duration = 2.2
 
 # FFmpeg is normally downloaded and detected automatically. If detection fails,
 # download it from https://www.gyan.dev/ffmpeg/builds/ and set the executable.

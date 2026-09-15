@@ -1158,6 +1158,7 @@ def _run_cross_post(
         )
         youtube_extra = None
         post_title = video_subject or "Check out this video! #shorts #viral"
+        post_description = ""
         if platforms:
             has_youtube = any(platform.startswith("youtube") for platform in platforms)
             social_platform = "youtube_shorts"
@@ -1181,11 +1182,18 @@ def _run_cross_post(
                     "containsSyntheticMedia": True,
                 }
             post_title = (
-                metadata.get("caption")
-                or metadata.get("title")
+                metadata.get("title")
                 or video_subject
                 or "Check out this video! #shorts #viral"
             )
+            post_description = metadata.get("caption") or ""
+            hashtags = metadata.get("hashtags") or []
+            if hashtags:
+                post_description = (
+                    f"{post_description}\n\n{' '.join(hashtags)}"
+                    if post_description
+                    else " ".join(hashtags)
+                )
 
         for video_path in video_paths:
             result = upload_post.cross_post_video(
@@ -1193,6 +1201,7 @@ def _run_cross_post(
                 title=post_title,
                 platforms=list(platforms),
                 youtube_extra=youtube_extra,
+                description=post_description or None,
             )
             if not isinstance(result, dict):
                 result = {
@@ -1594,6 +1603,41 @@ def _run_pipeline(
     logger.success(
         f"task {task_id} finished, generated {len(final_video_paths)} videos."
     )
+
+    if config.app.get("enable_title_card", True):
+        try:
+            title_metadata = llm.generate_social_metadata(
+                video_subject=params.video_subject or "",
+                video_script=video_script,
+                language=params.video_language or "",
+                platform="instagram",
+            )
+            title_text = title_metadata.get("title") or params.video_subject or ""
+            card_duration = float(config.app.get("title_card_duration", 2.2))
+            if title_text.strip():
+                for index, video_path in enumerate(final_video_paths):
+                    bg_source = (
+                        combined_video_paths[index]
+                        if index < len(combined_video_paths)
+                        else None
+                    )
+                    video.prepend_title_card(
+                        video_path,
+                        title_text,
+                        card_duration,
+                        bg_source,
+                    )
+        except Exception as e:
+            logger.warning(f"failed to generate title card: {e}")
+
+    try:
+        labeled_paths = utils.save_labeled_videos(
+            task_id, params.video_subject, final_video_paths
+        )
+        if labeled_paths:
+            logger.info(f"copied labeled videos to: {os.path.dirname(labeled_paths[0])}")
+    except Exception as e:
+        logger.warning(f"failed to save labeled videos copy: {e}")
 
     # 7. 先完成视频生成任务，再按需提交跨平台发布。第三方上传可能耗时
     # 数分钟，不应阻塞视频结果返回，也不能反向影响已经生成的成片。

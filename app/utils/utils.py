@@ -116,6 +116,48 @@ def task_dir(sub_dir: str = ""):
     return d
 
 
+def videos_dir(create: bool = True):
+    d = os.path.join(root_dir(), "Videos")
+    if create and not os.path.exists(d):
+        os.makedirs(d)
+    return d
+
+
+def slugify_subject(subject: str, max_len: int = 60) -> str:
+    subject = (subject or "video").strip().lower()
+    subject = re.sub(r"[^a-z0-9]+", "-", subject).strip("-")
+    return subject[:max_len] or "video"
+
+
+def save_labeled_videos(task_id: str, video_subject: str, final_video_paths: list):
+    """Copy finished videos into a friendly, dated, subject-labeled folder
+    alongside the raw storage/tasks/<task_id> output, so users can find
+    their videos without hunting through UUID folders."""
+    if not final_video_paths:
+        return []
+
+    from datetime import datetime
+
+    date_str = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+    slug = slugify_subject(video_subject)
+    dest_dir = os.path.join(videos_dir(create=True), f"{date_str}_{slug}_{task_id[:8]}")
+    os.makedirs(dest_dir, exist_ok=True)
+
+    labeled_paths = []
+    for idx, src in enumerate(final_video_paths, start=1):
+        if not os.path.exists(src):
+            continue
+        ext = os.path.splitext(src)[1] or ".mp4"
+        dest = os.path.join(dest_dir, f"{slug}-{idx}{ext}")
+        try:
+            shutil.copy2(src, dest)
+            labeled_paths.append(dest)
+        except OSError as e:
+            logger.warning(f"could not copy video to labeled folder: {e}")
+
+    return labeled_paths
+
+
 def font_dir(sub_dir: str = ""):
     d = resource_dir("fonts")
     if sub_dir:
@@ -278,6 +320,22 @@ def str_contains_punctuation(word):
     return False
 
 
+MAX_SUBTITLE_CLAUSE_WORDS = 7
+
+
+def _cap_clause_word_count(clause: str, max_words: int = MAX_SUBTITLE_CLAUSE_WORDS) -> list:
+    """Split one punctuation-delimited clause into shorter word-count-capped
+    chunks. A long comma-free sentence would otherwise become a single
+    oversized subtitle that wraps into several lines on screen -- capping
+    keeps each burned-in subtitle to a short-form-caption-style length."""
+    words = clause.split()
+    if len(words) <= max_words:
+        return [clause]
+    return [
+        " ".join(words[i : i + max_words]) for i in range(0, len(words), max_words)
+    ]
+
+
 def split_string_by_punctuations(s):
     result = []
     txt = ""
@@ -317,7 +375,10 @@ def split_string_by_punctuations(s):
     result.append(txt.strip())
     # filter empty string
     result = list(filter(None, result))
-    return result
+    capped = []
+    for clause in result:
+        capped.extend(_cap_clause_word_count(clause))
+    return capped
 
 
 PAUSE_TAG_KEYWORDS = (

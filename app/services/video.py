@@ -22,6 +22,8 @@ from moviepy import (
     TextClip,
     VideoFileClip,
     afx,
+    concatenate_videoclips,
+    vfx,
 )
 from moviepy.video.tools.subtitles import SubtitlesClip
 from PIL import Image, ImageDraw, ImageFont
@@ -1364,7 +1366,10 @@ def generate_video(
             _clip = _apply_subtitle_spring_animation(_clip, duration)
 
         if params.subtitle_position == "bottom":
-            _clip = _clip.with_position(("center", video_height * 0.95 - _clip.h))
+            # 0.95 puts subtitles inside the safe-area TikTok/Reels/Shorts
+            # reserve for their own share/caption UI (~12-15% of height) --
+            # 0.83 keeps them clear of it on 9:16 video.
+            _clip = _clip.with_position(("center", video_height * 0.83 - _clip.h))
         elif params.subtitle_position == "top":
             _clip = _clip.with_position(("center", video_height * 0.05))
         elif params.subtitle_position in ("two_thirds_bottom", "two_thirds", "2/3_bottom"):
@@ -1604,3 +1609,202 @@ def preprocess_video(materials: List[MaterialInfo], clip_duration=4):
         valid_materials.append(material)
 
     return valid_materials
+
+
+# Words that get the yellow highlight in the title card instead of the
+# default white, so one or two punchy words pop the way a real thumbnail
+# designer would emphasize them. Numbers are highlighted separately.
+_TITLE_CARD_HIGHLIGHT_WORDS = {
+    "hack", "hacks", "brain", "secret", "secrets", "trick", "tricks",
+    "never", "always", "free", "mistake", "mistakes", "stop", "warning",
+    "shocking", "truth", "danger", "scam", "rich", "money", "banned",
+    "illegal", "exposed", "worst", "best", "why", "insane", "crazy",
+    "wrong", "lie", "lies", "myth", "scary", "dangerous", "toxic",
+}
+
+
+def _draw_title_card_image(
+    text: str,
+    width: int,
+    height: int,
+    background_frame=None,
+    font_path: str | None = None,
+    transparent_bg: bool = False,
+) -> np.ndarray:
+    """Render a title-card text layer: bold headline styled like a feed
+    thumbnail (accent-colored highlight bars behind wrapped text lines)
+    rather than the continuous subtitle style.
+
+    transparent_bg=True skips the dimmed-backdrop compositing and returns
+    an RGBA image (transparent everywhere but the text/highlight boxes) so
+    the caller can overlay it on a moving background clip instead of a
+    single frozen frame. transparent_bg=False keeps the original baked-in
+    (opaque, RGB) behavior."""
+    if transparent_bg:
+        base = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+    elif background_frame is not None:
+        base = Image.fromarray(background_frame).convert("RGB").resize((width, height))
+        base = Image.eval(base, lambda x: int(x * 0.4))
+    else:
+        base = Image.new("RGB", (width, height), (12, 10, 20))
+
+    font_path = font_path or os.path.join(utils.font_dir(), "BeVietnamPro-Bold.ttf")
+    max_text_width = int(width * 0.86)
+    max_text_height = int(height * 0.4)
+
+    fontsize = 96
+    wrapped, text_height = wrap_text(
+        text.upper(), max_text_width, font=font_path, fontsize=fontsize
+    )
+    while text_height > max_text_height and fontsize > 36:
+        fontsize -= 6
+        wrapped, text_height = wrap_text(
+            text.upper(), max_text_width, font=font_path, fontsize=fontsize
+        )
+
+    font = ImageFont.truetype(font_path, fontsize)
+    lines = [line.strip() for line in wrapped.split("\n") if line.strip()]
+    line_height = text_height / max(len(lines), 1)
+
+    draw = ImageDraw.Draw(base, "RGBA")
+    accent = (108, 59, 244, 235)  # brand purple, matches the logo
+    highlight_color = (255, 214, 0, 255)  # yellow accent for the punchy word(s)
+    white = (255, 255, 255, 255)
+    pad_x, pad_y = int(fontsize * 0.35), int(fontsize * 0.16)
+    start_y = int(height * 0.12)
+    space_w = font.getlength(" ")
+
+    for i, line in enumerate(lines):
+        bbox = font.getbbox(line)
+        line_w = bbox[2] - bbox[0]
+        x = (width - line_w) // 2
+        y = start_y + int(i * line_height)
+        draw.rounded_rectangle(
+            [x - pad_x, y - pad_y, x + line_w + pad_x, y + line_height - bbox[1] + pad_y],
+            radius=int(fontsize * 0.25),
+            fill=accent,
+        )
+
+        cursor_x = x
+        for word in line.split(" "):
+            if not word:
+                cursor_x += space_w
+                continue
+            clean_word = word.strip(".,!?:;\"'").lower()
+            fill = (
+                highlight_color
+                if clean_word in _TITLE_CARD_HIGHLIGHT_WORDS or clean_word.isdigit()
+                else white
+            )
+            draw.text(
+                (cursor_x, y),
+                word,
+                font=font,
+                fill=fill,
+                stroke_width=max(1, fontsize // 28),
+                stroke_fill=(0, 0, 0, 255),
+            )
+            cursor_x += font.getlength(word) + space_w
+
+    return np.array(base) if transparent_bg else np.array(base.convert("RGB"))
+
+
+def prepend_title_card(
+    video_path: str,
+    title_text: str,
+    duration: float = 2.2,
+    background_source_path: str | None = None,
+) -> bool:
+    """Overlay a bold title card on the OPENING `duration` seconds of an
+    already-rendered final video, instead of prepending a separate clip.
+
+    This does NOT add any extra runtime or a second voice track: the
+    narration (and BGM, and everything else already mixed into the video's
+    audio) just plays straight through from frame 0, uninterrupted -- the
+    card is a pure visual overlay on top of it. Earlier versions generated
+    a separate TTS reading of the title, which meant two different voice
+    clips stitched together (with all the silence-gap/timing issues that
+    implies); this reads better because there's only ever one continuous
+    voice, the same one that already sounds right for the rest of the
+    video.
+
+    Overwrites video_path in place; returns False (leaving the original
+    file untouched) on any failure.
+
+    `background_source_path` should point at the pre-subtitle combined clip
+    when available, so the opening segment shows real moving footage
+    without the regular burned-in captions competing with the title card
+    text on screen at the same time (the rest of the video, past
+    `duration`, keeps its normal captions untouched)."""
+    if not title_text or not title_text.strip():
+        return False
+
+    tmp_output = f"{video_path}.titlecard.mp4"
+    clip = None
+    bg_clip = None
+    opening_visual = None
+    overlay_clip = None
+    opening_composite = None
+    rest_clip = None
+    combined = None
+    try:
+        clip = _open_video_clip_quietly(video_path, audio=True)
+        card_duration = min(duration, clip.duration)
+
+        bg_source = background_source_path if background_source_path and os.path.exists(background_source_path) else video_path
+        bg_clip = clip if bg_source == video_path else _open_video_clip_quietly(bg_source, audio=False)
+        opening_visual = (
+            bg_clip.subclipped(0, min(card_duration, bg_clip.duration))
+            .without_audio()
+            .with_effects([vfx.MultiplyColor(0.4)])
+        )
+        if opening_visual.duration < card_duration:
+            opening_visual = opening_visual.with_effects(
+                [vfx.Loop(duration=card_duration)]
+            )
+
+        overlay_image = _draw_title_card_image(
+            title_text, clip.w, clip.h, transparent_bg=True
+        )
+        overlay_clip = ImageClip(overlay_image, duration=card_duration).with_position(
+            ("center", "center")
+        )
+
+        opening_composite = CompositeVideoClip(
+            [opening_visual, overlay_clip], size=(clip.w, clip.h)
+        ).with_duration(card_duration)
+        # Same audio the rest of the video already has (narration + BGM,
+        # whatever's mixed in) -- just the first slice of it, so nothing
+        # about the voice or music restarts or cuts at this boundary.
+        opening_composite = opening_composite.with_audio(
+            clip.audio.subclipped(0, card_duration) if clip.audio is not None else None
+        )
+
+        rest_clip = clip.subclipped(card_duration, clip.duration)
+        combined = concatenate_videoclips(
+            [opening_composite, rest_clip], method="compose"
+        )
+        _write_videofile_with_codec_fallback(
+            combined,
+            output_file=tmp_output,
+            codec=_get_configured_video_codec(),
+            audio_codec="aac",
+            threads=2,
+            logger=None,
+            fps=clip.fps,
+        )
+        os.replace(tmp_output, video_path)
+        return True
+    except Exception as exc:
+        logger.warning(f"failed to prepend title card: {video_path}, error: {exc}")
+        if os.path.exists(tmp_output):
+            delete_files(tmp_output)
+        return False
+    finally:
+        close_clip(combined)
+        close_clip(rest_clip)
+        close_clip(opening_composite)
+        close_clip(opening_visual)
+        if bg_clip is not None and bg_clip is not clip:
+            close_clip(bg_clip)
+        close_clip(clip)

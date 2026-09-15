@@ -6,6 +6,7 @@ import re
 import shutil
 import subprocess
 import tempfile
+from datetime import datetime
 from time import perf_counter
 from typing import List
 
@@ -254,6 +255,37 @@ def _extract_qwen_generation_text(response) -> str:
     return _normalize_text_response(text, "qwen")
 
 
+_QUOTA_FILE = os.path.join(utils.storage_dir(create=True), "gemini_quota.json")
+_QUOTA_WARN_THRESHOLD = 16  # gemini-3.6-flash free tier caps at 20 requests/day
+
+
+def _track_gemini_call(llm_provider: str):
+    """Best-effort daily call counter for the Gemini free tier's 20 req/day
+    cap, so a busy day fails loud (log warning) instead of silently running
+    out of quota mid-batch. Never raises — tracking failures must not break
+    generation."""
+    if llm_provider != "gemini":
+        return
+    try:
+        today = datetime.now().strftime("%Y-%m-%d")
+        state = {}
+        if os.path.exists(_QUOTA_FILE):
+            with open(_QUOTA_FILE) as f:
+                state = json.load(f)
+        if state.get("date") != today:
+            state = {"date": today, "count": 0}
+        state["count"] += 1
+        with open(_QUOTA_FILE, "w") as f:
+            json.dump(state, f)
+        if state["count"] >= _QUOTA_WARN_THRESHOLD:
+            logger.warning(
+                f"Gemini calls today: {state['count']}/20 free-tier limit — "
+                "approaching daily quota."
+            )
+    except Exception as e:
+        logger.debug(f"gemini quota tracking failed (non-fatal): {e}")
+
+
 def _generate_response(prompt: str, app_config=None) -> str:
     try:
         # WebUI 在视频生成期间允许用户准备下一条文案。调用方可以传入提交瞬间
@@ -263,6 +295,7 @@ def _generate_response(prompt: str, app_config=None) -> str:
         llm_provider = str(
             runtime_app_config.get("llm_provider", DEFAULT_LLM_PROVIDER_ID)
         ).lower()
+        _track_gemini_call(llm_provider)
         provider = get_llm_provider(llm_provider)
         if provider is None:
             raise ValueError(f"{llm_provider}: unsupported llm provider")
