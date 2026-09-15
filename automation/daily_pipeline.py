@@ -19,6 +19,7 @@ import subprocess
 import sys
 import tempfile
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, BASE_DIR)
@@ -39,7 +40,7 @@ VIDEOS_PER_RUN = 4
 # threshold.
 LINK_IN_BIO_URL = "tinyurl.com/238zsuaa"
 LINK_IN_BIO_CTA = f"\n\n\U0001f517 More facts + early access: {LINK_IN_BIO_URL}"
-CET_OFFSET_HOURS = 2  # CEST (summer time); adjust to 1 in winter
+CET_ZONE = ZoneInfo("Europe/Amsterdam")  # DST-aware CET/CEST, no manual offset to maintain
 
 
 CATEGORY_KEYWORDS = {
@@ -129,9 +130,19 @@ def load_backlog() -> list:
         return json.load(f)
 
 
+def _atomic_write_json(path: str, data):
+    """Write via tmp file + os.replace so a crash mid-write (launchd
+    timeout, OOM, machine sleep) never leaves a truncated/corrupt file --
+    plain open(path, 'w') can, and the next run would then crash on
+    json.load() with no recovery path."""
+    tmp_path = path + ".tmp"
+    with open(tmp_path, "w") as f:
+        json.dump(data, f, indent=2)
+    os.replace(tmp_path, path)
+
+
 def save_backlog(remaining: list):
-    with open(BACKLOG_FILE, "w") as f:
-        json.dump(remaining, f, indent=2)
+    _atomic_write_json(BACKLOG_FILE, remaining)
 
 
 def load_state() -> dict:
@@ -140,8 +151,7 @@ def load_state() -> dict:
 
 
 def save_state(state: dict):
-    with open(STATE_FILE, "w") as f:
-        json.dump(state, f, indent=2)
+    _atomic_write_json(STATE_FILE, state)
 
 
 def extract_and_set_thumbnail(youtube_video_id: str, video_path: str):
@@ -175,15 +185,15 @@ def next_slot_utc(state: dict) -> datetime:
     now = datetime.now(timezone.utc)
     anchor = max(last, now)
     slot_hours = sorted(state["slot_hours_cet"])
-    cet = anchor + timedelta(hours=CET_OFFSET_HOURS)
+    cet = anchor.astimezone(CET_ZONE)
     for h in slot_hours:
-        if h > cet.hour or (h == cet.hour and cet.minute > 0 and False):
+        if h > cet.hour:
             candidate_cet = cet.replace(hour=h, minute=0, second=0, microsecond=0)
-            return candidate_cet - timedelta(hours=CET_OFFSET_HOURS)
+            return candidate_cet.astimezone(timezone.utc)
     candidate_cet = (cet + timedelta(days=1)).replace(
         hour=slot_hours[0], minute=0, second=0, microsecond=0
     )
-    return candidate_cet - timedelta(hours=CET_OFFSET_HOURS)
+    return candidate_cet.astimezone(timezone.utc)
 
 
 def run_batch(topics: list) -> list:
