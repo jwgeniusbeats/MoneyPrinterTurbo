@@ -48,6 +48,43 @@ def get_video_insights(video_id: str) -> dict:
     }
 
 
+def list_comments(video_id: str) -> list[dict]:
+    """Top-level comments on a Facebook Page video, newest first. Returns
+    [{"comment_id", "from", "text", "created_time"}, ...]."""
+    _, token = _load_page_token()
+    resp = requests.get(
+        f"https://graph.facebook.com/{GRAPH_VERSION}/{video_id}/comments",
+        params={
+            "fields": "id,message,from,created_time",
+            "order": "reverse_chronological",
+            "access_token": token,
+        },
+        timeout=30,
+    )
+    resp.raise_for_status()
+    return [
+        {
+            "comment_id": item["id"],
+            "from": item.get("from", {}).get("name", ""),
+            "text": item.get("message", ""),
+            "created_time": item.get("created_time", ""),
+        }
+        for item in resp.json().get("data", [])
+    ]
+
+
+def reply_to_comment(comment_id: str, text: str) -> dict:
+    """Posts a public reply to an existing top-level comment on our own video."""
+    _, token = _load_page_token()
+    resp = requests.post(
+        f"https://graph.facebook.com/{GRAPH_VERSION}/{comment_id}/comments",
+        data={"message": text[:8000], "access_token": token},
+        timeout=30,
+    )
+    resp.raise_for_status()
+    return resp.json()
+
+
 def update_video_description(video_id: str, description: str) -> dict:
     """Update an already-published Facebook video's description in place."""
     _, token = _load_page_token()

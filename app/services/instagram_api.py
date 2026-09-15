@@ -28,6 +28,39 @@ def _load_token() -> tuple[str, str]:
     return str(data["user_id"]), data["long_lived_token"]
 
 
+def list_comments(media_id: str) -> list[dict]:
+    """Top-level comments on a published Reel, newest first. Returns
+    [{"comment_id", "username", "text", "timestamp"}, ...]."""
+    _, token = _load_token()
+    resp = requests.get(
+        f"https://graph.instagram.com/{GRAPH_VERSION}/{media_id}/comments",
+        params={"fields": "id,text,username,timestamp", "access_token": token},
+        timeout=30,
+    )
+    resp.raise_for_status()
+    return [
+        {
+            "comment_id": item["id"],
+            "username": item.get("username", ""),
+            "text": item.get("text", ""),
+            "timestamp": item.get("timestamp", ""),
+        }
+        for item in resp.json().get("data", [])
+    ]
+
+
+def reply_to_comment(comment_id: str, text: str) -> dict:
+    """Posts a public reply to an existing top-level comment on our own media."""
+    _, token = _load_token()
+    resp = requests.post(
+        f"https://graph.instagram.com/{GRAPH_VERSION}/{comment_id}/replies",
+        data={"message": text[:2200], "access_token": token},
+        timeout=30,
+    )
+    resp.raise_for_status()
+    return resp.json()
+
+
 def get_reel_insights(media_id: str) -> dict:
     """Lifetime views/likes/comments for a published Reel. Was blocked for
     months by the same Meta account restriction that blocked posting;

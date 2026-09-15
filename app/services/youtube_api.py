@@ -23,6 +23,10 @@ SCOPES = [
     "https://www.googleapis.com/auth/youtube.upload",
     "https://www.googleapis.com/auth/youtube.readonly",
     "https://www.googleapis.com/auth/yt-analytics.readonly",
+    # Comment listing/moderation (commentThreads.list with
+    # allThreadsRelatedToChannelId, comments.insert) 403s with just
+    # "youtube" -- Google enforces this one specifically, found 2026-09-16.
+    "https://www.googleapis.com/auth/youtube.force-ssl",
 ]
 
 _BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -223,3 +227,59 @@ def set_thumbnail(video_id: str, image_path: str):
     youtube = get_authenticated_service()
     media = MediaFileUpload(image_path, mimetype="image/jpeg")
     return youtube.thumbnails().set(videoId=video_id, media_body=media).execute()
+
+
+def list_recent_top_level_comments(max_results: int = 50) -> list[dict]:
+    """
+    Top-level comments across ALL of this channel's videos, newest first --
+    `allThreadsRelatedToChannelId` avoids having to loop over every video_id
+    individually. Returns [{"comment_id", "video_id", "author", "text",
+    "published_at"}, ...]. Does not include the channel's own replies (those
+    live in `.replies`, not as separate top-level threads).
+    """
+    youtube = get_authenticated_service()
+    channel_resp = youtube.channels().list(part="id", mine=True).execute()
+    channel_id = channel_resp["items"][0]["id"]
+
+    resp = (
+        youtube.commentThreads()
+        .list(
+            part="snippet",
+            allThreadsRelatedToChannelId=channel_id,
+            order="time",
+            maxResults=max_results,
+            textFormat="plainText",
+        )
+        .execute()
+    )
+    out = []
+    for item in resp.get("items", []):
+        top = item["snippet"]["topLevelComment"]
+        out.append(
+            {
+                "comment_id": top["id"],
+                "video_id": item["snippet"]["videoId"],
+                "author": top["snippet"]["authorDisplayName"],
+                "text": top["snippet"]["textDisplay"],
+                "published_at": top["snippet"]["publishedAt"],
+            }
+        )
+    return out
+
+
+def reply_to_comment(parent_comment_id: str, text: str) -> dict:
+    """Posts a public reply to an existing top-level comment."""
+    youtube = get_authenticated_service()
+    return (
+        youtube.comments()
+        .insert(
+            part="snippet",
+            body={
+                "snippet": {
+                    "parentId": parent_comment_id,
+                    "textOriginal": text[:10000],
+                }
+            },
+        )
+        .execute()
+    )
