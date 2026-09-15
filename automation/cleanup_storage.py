@@ -12,6 +12,15 @@ archive -- see app.utils.utils.save_labeled_videos) AND the folder is
 older than MIN_AGE_DAYS. A task folder with no matching Videos/ copy is
 left alone (still in progress, or the copy step failed) no matter how old.
 
+Also runs app.services.cache_manager.clean_video_cache() (storage/cache_videos
+-- downloaded stock-footage clips, keyed by source URL so repeat searches can
+reuse them). That function already exists but is only ever wired to a manual
+button in the Streamlit WebUI; our automation is headless and nobody clicks
+it, so this cache also grows forever on its own -- found at 1GB/150 files on
+2026-09-16. Kept for CACHE_VIDEOS_MAX_AGE_DAYS since, unlike storage/tasks,
+older cached clips are still genuinely useful (avoids re-downloading the same
+stock footage for a topic with similar search terms to an earlier video).
+
 Usage: uv run python automation/cleanup_storage.py [--dry-run]
 Intended to run daily (e.g. appended to the daily_pipeline cron) or by hand.
 """
@@ -24,9 +33,12 @@ import time
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, BASE_DIR)
 
+from app.services import cache_manager  # noqa: E402
+
 STORAGE_TASKS_DIR = os.path.join(BASE_DIR, "storage", "tasks")
 VIDEOS_DIR = os.path.join(BASE_DIR, "Videos")
 MIN_AGE_DAYS = 2
+CACHE_VIDEOS_MAX_AGE_DAYS = 7
 
 
 def _has_backed_up_video(task_id: str) -> bool:
@@ -100,6 +112,25 @@ def main(argv: list | None = None):
         f"Skipped {skipped_too_new} (too new, <{MIN_AGE_DAYS}d) and "
         f"{skipped_no_backup} (no confirmed Videos/ backup yet)."
     )
+
+    if args.dry_run:
+        cache_stats = cache_manager.get_video_cache_stats(
+            max_age_days=CACHE_VIDEOS_MAX_AGE_DAYS
+        )
+        print(
+            f"Would free {cache_stats.total_size / 1024 / 1024:.1f}MB from "
+            f"{cache_stats.file_count} cached video file(s) older than "
+            f"{CACHE_VIDEOS_MAX_AGE_DAYS}d in {cache_manager.video_cache_dir()}."
+        )
+    else:
+        cache_result = cache_manager.clean_video_cache(
+            max_age_days=CACHE_VIDEOS_MAX_AGE_DAYS
+        )
+        print(
+            f"Freed {cache_result.deleted_size / 1024 / 1024:.1f}MB from "
+            f"{cache_result.deleted_count} cached video file(s) "
+            f"({cache_result.failed_count} failed to delete)."
+        )
 
 
 if __name__ == "__main__":
