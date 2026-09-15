@@ -27,6 +27,7 @@ sys.path.insert(0, BASE_DIR)
 from app.services import llm, youtube_api  # noqa: E402
 from automation.daily_pipeline import (  # noqa: E402
     LINK_IN_BIO_CTA,
+    _atomic_write_json,
     build_seo_tags,
     extract_and_set_thumbnail,
 )
@@ -52,8 +53,11 @@ def load_compilation_log() -> list:
 
 
 def save_compilation_log(entries: list):
-    with open(COMPILATION_LOG_FILE, "w") as f:
-        json.dump(entries, f, indent=2)
+    # Atomic write -- this script's own comment above (ffmpeg re-encode +
+    # a real YouTube upload, "several minutes") is exactly the crash-mid-
+    # write window a plain open(path, "w") is exposed to; see the same fix
+    # applied to schedule_state.json/topic_backlog.json in daily_pipeline.py.
+    _atomic_write_json(COMPILATION_LOG_FILE, entries)
 
 
 def pick_clips(post_log: list, already_used: set) -> list:
