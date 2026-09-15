@@ -284,6 +284,16 @@
         "stats_fetched_at": "2026-09-15T08:32:15.379073+00:00",
         "avg_view_duration_sec": 0,
         "avg_view_percentage": 0
+      },
+      "facebook": {
+        "id": "2128758978037647",
+        "status": "live",
+        "posted_at": "2026-09-15T13:00:00Z"
+      },
+      "instagram": {
+        "id": "18111771194327624",
+        "status": "live",
+        "posted_at": "2026-09-15T13:00:00Z"
       }
     }
   },
@@ -304,6 +314,16 @@
         "stats_fetched_at": "2026-09-15T08:32:15.708231+00:00",
         "avg_view_duration_sec": 0,
         "avg_view_percentage": 0
+      },
+      "facebook": {
+        "id": "1106658748558173",
+        "status": "live",
+        "posted_at": "2026-09-15T13:00:00Z"
+      },
+      "instagram": {
+        "id": "18326170501263601",
+        "status": "live",
+        "posted_at": "2026-09-15T13:00:00Z"
       }
     }
   },
@@ -324,6 +344,16 @@
         "stats_fetched_at": "2026-09-15T08:32:16.126512+00:00",
         "avg_view_duration_sec": 0,
         "avg_view_percentage": 0
+      },
+      "facebook": {
+        "id": "1592736938977121",
+        "status": "live",
+        "posted_at": "2026-09-15T13:00:00Z"
+      },
+      "instagram": {
+        "id": "18147943717528403",
+        "status": "live",
+        "posted_at": "2026-09-15T13:00:00Z"
       }
     }
   },
@@ -344,6 +374,16 @@
         "stats_fetched_at": "2026-09-15T08:32:16.533382+00:00",
         "avg_view_duration_sec": 0,
         "avg_view_percentage": 0
+      },
+      "facebook": {
+        "id": "1645026510468574",
+        "status": "live",
+        "posted_at": "2026-09-15T13:00:00Z"
+      },
+      "instagram": {
+        "id": "18098475248377782",
+        "status": "live",
+        "posted_at": "2026-09-15T13:00:00Z"
       }
     }
   }
