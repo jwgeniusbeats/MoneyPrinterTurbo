@@ -1,0 +1,258 @@
+<title>Nognize</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700;900&family=Manrope:wght@400;500;600;700&display=swap');
+
+  :root {
+    --bg: #0a0813;
+    --bg-glow: #150f26;
+    --surface: #161225;
+    --surface-hover: #1f1a33;
+    --border: #2a2440;
+    --text: #f4f0ff;
+    --text-dim: #a89bc9;
+    --accent: #8b5cf6;
+    --accent-bright: #b39cff;
+    --bulb: #fbbf24;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: radial-gradient(ellipse 120% 60% at 50% -10%, var(--bg-glow), var(--bg) 55%);
+    color: var(--text);
+    font-family: 'Manrope', system-ui, sans-serif;
+    display: flex;
+    justify-content: center;
+    padding-block: 56px 40px;
+  }
+
+  .page {
+    width: 100%;
+    max-width: 440px;
+    padding-inline: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 28px;
+  }
+
+  .avatar {
+    width: 96px;
+    height: 96px;
+    border-radius: 50%;
+    background: linear-gradient(160deg, var(--surface), #0d0a18);
+    border: 1.5px solid var(--border);
+    display: grid;
+    place-items: center;
+    box-shadow: 0 0 0 1px rgba(139, 92, 246, 0.08), 0 18px 40px -12px rgba(139, 92, 246, 0.45);
+  }
+
+  .avatar svg { width: 52px; height: 52px; }
+
+  .identity { text-align: center; display: flex; flex-direction: column; gap: 8px; }
+
+  .wordmark {
+    font-family: 'Unbounded', system-ui, sans-serif;
+    font-weight: 700;
+    font-size: 26px;
+    letter-spacing: 0.02em;
+    margin: 0;
+    text-wrap: balance;
+  }
+
+  .tagline {
+    margin: 0;
+    color: var(--text-dim);
+    font-size: 14.5px;
+    line-height: 1.5;
+    max-width: 30ch;
+  }
+
+  .links {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .link-btn {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    width: 100%;
+    padding: 15px 18px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    color: var(--text);
+    text-decoration: none;
+    font-family: 'Manrope', system-ui, sans-serif;
+    font-weight: 600;
+    font-size: 15.5px;
+    transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+  }
+
+  .link-btn:hover { background: var(--surface-hover); border-color: var(--accent); transform: translateY(-1px); }
+  .link-btn:active { transform: translateY(0); }
+
+  .link-btn .icon {
+    width: 22px; height: 22px; flex: none;
+    display: grid; place-items: center;
+    color: var(--accent-bright);
+  }
+  .link-btn .icon svg { width: 100%; height: 100%; }
+
+  .link-btn .platform-meta { display: flex; flex-direction: column; gap: 1px; }
+  .link-btn .handle { font-weight: 700; }
+  .link-btn .sub { font-size: 12px; color: var(--text-dim); font-weight: 500; }
+
+  .link-btn .arrow { margin-left: auto; color: var(--text-dim); flex: none; }
+
+  .divider {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: var(--text-dim);
+    font-size: 11.5px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    font-weight: 600;
+  }
+  .divider::before, .divider::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+
+  .capture {
+    width: 100%;
+    background: linear-gradient(160deg, var(--surface), #100c1d);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 22px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .capture h2 {
+    font-family: 'Unbounded', system-ui, sans-serif;
+    font-size: 16.5px;
+    font-weight: 500;
+    margin: 0;
+    text-wrap: balance;
+  }
+
+  .capture p { margin: -8px 0 0; color: var(--text-dim); font-size: 13.5px; line-height: 1.5; }
+
+  .capture-cta {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background: var(--accent);
+    color: #0a0813;
+    border: none;
+    border-radius: 10px;
+    padding: 13px 18px;
+    text-decoration: none;
+    font-family: 'Manrope', system-ui, sans-serif;
+    font-weight: 700;
+    font-size: 14.5px;
+    cursor: pointer;
+    transition: background 0.15s ease, transform 0.1s ease;
+  }
+  .capture-cta:hover { background: var(--accent-bright); }
+  .capture-cta:active { transform: scale(0.98); }
+
+  .fact {
+    width: 100%;
+    text-align: center;
+    font-size: 12.5px;
+    color: var(--text-dim);
+    line-height: 1.6;
+    padding-top: 4px;
+  }
+  .fact b { color: var(--accent-bright); font-weight: 700; }
+
+  .footer {
+    text-align: center;
+    font-size: 11.5px;
+    color: #4d4463;
+    letter-spacing: 0.03em;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .link-btn { transition: none; }
+  }
+</style>
+
+<div class="page">
+  <div class="avatar">
+    <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M32 6c-8.5 0-14 6-14 13.5 0 4 1.7 6.6 3.4 8.9C22.7 30 24 32 24 35v6a4 4 0 0 0 4 4h8a4 4 0 0 0 4-4v-6c0-3 1.3-5 2.6-6.6 1.7-2.3 3.4-4.9 3.4-8.9C46 12 40.5 6 32 6Z" stroke="#8b5cf6" stroke-width="2.6" stroke-linejoin="round"/>
+      <path d="M27 45h10M28 50h8" stroke="#8b5cf6" stroke-width="2.6" stroke-linecap="round"/>
+      <path d="M32 13v18M26 19c0-3 2.5-5 6-5M38 19c0-3-2.5-5-6-5M25 25c1.5 1.5 4 2 7 2s5.5-.5 7-2" stroke="#fbbf24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </div>
+
+  <div class="identity">
+    <h1 class="wordmark">NOGNIZE</h1>
+    <p class="tagline">Mind-bending psychology facts, daily. Everywhere you scroll.</p>
+  </div>
+
+  <nav class="links">
+    <a class="link-btn" href="https://www.youtube.com/channel/UCnRqjCxxcyOeTjRlwSM-cfA" target="_blank" rel="noopener">
+      <span class="icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none"><rect x="1.5" y="5.5" width="21" height="13" rx="4" stroke="currentColor" stroke-width="1.8"/><path d="M10 9.3v5.4l5-2.7-5-2.7Z" fill="currentColor"/></svg>
+      </span>
+      <span class="platform-meta"><span class="handle">YouTube</span><span class="sub">Shorts &amp; weekly deep dives</span></span>
+      <span class="arrow" aria-hidden="true">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </span>
+    </a>
+
+    <a class="link-btn" href="https://www.tiktok.com/@nognize" target="_blank" rel="noopener">
+      <span class="icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M14 3v10.6a3.4 3.4 0 1 1-2.4-3.25M14 3c.3 2 1.8 3.6 4 3.9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </span>
+      <span class="platform-meta"><span class="handle">TikTok</span><span class="sub">@nognize — daily drops</span></span>
+      <span class="arrow" aria-hidden="true">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </span>
+    </a>
+
+    <a class="link-btn" href="https://www.instagram.com/nognize/" target="_blank" rel="noopener">
+      <span class="icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="5.5" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="1.8"/><circle cx="17.2" cy="6.8" r="1.1" fill="currentColor"/></svg>
+      </span>
+      <span class="platform-meta"><span class="handle">Instagram</span><span class="sub">Daily psychology reels</span></span>
+      <span class="arrow" aria-hidden="true">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </span>
+    </a>
+
+    <a class="link-btn" href="https://www.facebook.com/profile.php?id=61594520871984" target="_blank" rel="noopener">
+      <span class="icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9.2" stroke="currentColor" stroke-width="1.8"/><path d="M13.6 21V13h2.1l.4-2.6h-2.5V8.7c0-.75.3-1.3 1.4-1.3h1.2V5.1c-.4 0-1.3-.1-2.1-.1-2.1 0-3.4 1.2-3.4 3.5v2h-2.3V13h2.3v8" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+      </span>
+      <span class="platform-meta"><span class="handle">Facebook</span><span class="sub">Full videos, same daily facts</span></span>
+      <span class="arrow" aria-hidden="true">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </span>
+    </a>
+  </nav>
+
+  <div class="divider">Before you go</div>
+
+  <div class="capture">
+    <h2>Get the facts before they drop</h2>
+    <p>One email, zero spam. Early access to new drops + our free facts pack.</p>
+    <a class="capture-cta" href="https://docs.google.com/forms/d/e/1FAIpQLScXEy0GdTDwFSGdJMh_hYRBOcojkae2O4W5CSKW-zxRgHI42w/viewform" target="_blank" rel="noopener">
+      Notify me
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </a>
+  </div>
+
+  <p class="fact">Did you know? <b>Déjà vu</b> isn't a glitch — it's your brain misfiling a brand-new moment straight into long-term memory.</p>
+
+  <div class="footer">NOGNIZE &middot; psychology &amp; human behavior</div>
+</div>

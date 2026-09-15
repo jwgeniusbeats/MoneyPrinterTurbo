@@ -1,0 +1,4 @@
+2026-09-13 10:00:02.118 | INFO     | app.config.config:load_config:471 - load config from file: /Users/geniusbeats/MoneyPrinterTurbo/config.toml
+2026-09-13 10:00:02.120 | INFO     | app.config.config:<module>:590 - MoneyPrinterTurbo v1.3.6
+2026-09-14 10:00:05.594 | INFO     | app.config.config:load_config:471 - load config from file: /Users/geniusbeats/MoneyPrinterTurbo/config.toml
+2026-09-14 10:00:05.596 | INFO     | app.config.config:<module>:590 - MoneyPrinterTurbo v1.3.6

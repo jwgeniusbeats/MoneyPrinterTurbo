@@ -1,0 +1,216 @@
+"""
+Pulls performance stats for every video in automation/post_log.json and
+writes automation/learnings.md: a short summary of what's working, fed back
+into future script generation by daily_pipeline.py (see run_batch()).
+
+Run manually with: uv run python automation/analyze_performance.py
+Intended to be invoked weekly by a scheduled task.
+"""
+import json
+import os
+import sys
+from datetime import datetime, timezone
+
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, BASE_DIR)
+
+from app.services import instagram_api, meta_api, youtube_api  # noqa: E402
+
+POST_LOG_FILE = os.path.join(BASE_DIR, "automation", "post_log.json")
+LEARNINGS_FILE = os.path.join(BASE_DIR, "automation", "learnings.md")
+
+MIN_VIDEOS_FOR_LEARNINGS = 5
+
+
+def load_post_log() -> list:
+    with open(POST_LOG_FILE) as f:
+        return json.load(f)
+
+
+def save_post_log(entries: list):
+    with open(POST_LOG_FILE, "w") as f:
+        json.dump(entries, f, indent=2)
+
+
+def refresh_youtube_stats(entries: list) -> list:
+    for entry in entries:
+        yt = entry.get("platforms", {}).get("youtube")
+        if not yt or not yt.get("id"):
+            continue
+        try:
+            stats = youtube_api.get_channel_analytics(yt["id"])
+            yt["views"] = int(stats.get("viewCount", 0))
+            yt["likes"] = int(stats.get("likeCount", 0))
+            yt["comments"] = int(stats.get("commentCount", 0))
+            yt["stats_fetched_at"] = datetime.now(timezone.utc).isoformat()
+        except Exception as e:
+            print(f"stats fetch failed for {entry.get('title')}: {e}", file=sys.stderr)
+        try:
+            retention = youtube_api.get_video_retention(yt["id"])
+            if retention:
+                yt["avg_view_duration_sec"] = retention.get("averageViewDuration")
+                yt["avg_view_percentage"] = retention.get("averageViewPercentage")
+        except Exception as e:
+            print(f"retention fetch failed for {entry.get('title')}: {e}", file=sys.stderr)
+    return entries
+
+
+def refresh_facebook_stats(entries: list) -> list:
+    """Was blocked for months by the Meta developer-account restriction;
+    confirmed working again once that cleared (2026-09-15)."""
+    for entry in entries:
+        fb = entry.get("platforms", {}).get("facebook")
+        if not fb or not fb.get("id"):
+            continue
+        try:
+            stats = meta_api.get_video_insights(fb["id"])
+            fb["views"] = stats["views"]
+            fb["likes"] = stats["likes"]
+            fb["comments"] = stats["comments"]
+            fb["stats_fetched_at"] = datetime.now(timezone.utc).isoformat()
+        except Exception as e:
+            print(f"facebook stats fetch failed for {entry.get('title')}: {e}", file=sys.stderr)
+    return entries
+
+
+def refresh_instagram_stats(entries: list) -> list:
+    """Was blocked for months by the Meta developer-account restriction;
+    confirmed working again once that cleared (2026-09-15)."""
+    for entry in entries:
+        ig = entry.get("platforms", {}).get("instagram")
+        if not ig or not ig.get("id"):
+            continue
+        try:
+            stats = instagram_api.get_reel_insights(ig["id"])
+            ig["views"] = stats["views"]
+            ig["likes"] = stats["likes"]
+            ig["comments"] = stats["comments"]
+            ig["stats_fetched_at"] = datetime.now(timezone.utc).isoformat()
+        except Exception as e:
+            print(f"instagram stats fetch failed for {entry.get('title')}: {e}", file=sys.stderr)
+    return entries
+
+
+def _total_views(entry: dict) -> int:
+    """Sum of views across every platform that has reported them."""
+    total = 0
+    for platform in entry.get("platforms", {}).values():
+        v = platform.get("views")
+        if v is not None:
+            total += int(v)
+    return total
+
+
+def _score(entry: dict) -> float:
+    """Prefer YouTube retention (% of video watched) over raw views: a much
+    stronger quality signal on a small channel where view counts are still
+    tiny and noisy. Falls back to YouTube views, then to summed views across
+    all platforms -- so a stretch where YouTube uploads are failing (account
+    block, quota, etc.) doesn't blind the whole learning loop even though
+    Facebook/Instagram/TikTok data keeps arriving fine."""
+    yt = entry.get("platforms", {}).get("youtube", {})
+    pct = yt.get("avg_view_percentage")
+    if pct:
+        return float(pct)
+    if yt.get("views") is not None:
+        return float(yt["views"])
+    return float(_total_views(entry))
+
+
+def write_learnings(entries: list):
+    scored = [e for e in entries if _total_views(e) > 0 or e.get("platforms", {}).get("youtube", {}).get("views") is not None]
+    if len(scored) < MIN_VIDEOS_FOR_LEARNINGS:
+        with open(LEARNINGS_FILE, "w") as f:
+            f.write(
+                "# Performance learnings\n\n"
+                f"Only {len(scored)} video(s) with stats so far "
+                f"(need {MIN_VIDEOS_FOR_LEARNINGS}+ for reliable patterns). "
+                "No learnings applied yet — keep posting.\n"
+            )
+        print(f"Only {len(scored)} scored videos, skipped learnings extraction.")
+        return
+
+    scored.sort(key=_score, reverse=True)
+    top = scored[:5]
+    bottom = scored[-3:]
+
+    def _fmt(e: dict) -> str:
+        yt = e.get("platforms", {}).get("youtube", {})
+        parts = []
+        if yt.get("views") is not None:
+            parts.append(f"{yt['views']} YT views")
+        if yt.get("likes") is not None:
+            parts.append(f"{yt['likes']} likes")
+        if yt.get("avg_view_percentage"):
+            parts.append(f"{yt['avg_view_percentage']:.0f}% avg watched")
+        tt_views = e.get("platforms", {}).get("tiktok", {}).get("views")
+        if tt_views is not None:
+            parts.append(f"{tt_views} TikTok views")
+        fb_views = e.get("platforms", {}).get("facebook", {}).get("views")
+        if fb_views is not None:
+            parts.append(f"{fb_views} FB views")
+        ig_views = e.get("platforms", {}).get("instagram", {}).get("views")
+        if ig_views is not None:
+            parts.append(f"{ig_views} IG views")
+        cat = e.get("category")
+        hook = e.get("hook_type")
+        tag = f" [{cat}/{hook}]" if cat or hook else ""
+        return f"- \"{e['title']}\"{tag} — {', '.join(parts)}: {e['subject']}"
+
+    lines = ["# Performance learnings", ""]
+    lines.append("Auto-generated from real YouTube view/retention data.")
+    lines.append("Used as extra context when generating new video scripts.")
+    lines.append("")
+    lines.append("## Top performing topics (ranked by YT watch-through %, falls back to YT views, then total cross-platform views)")
+    for e in top:
+        lines.append(_fmt(e))
+    lines.append("")
+    lines.append("## Lowest performing topics (avoid repeating this angle)")
+    for e in bottom:
+        lines.append(_fmt(e))
+
+    tagged = [e for e in scored if e.get("category")]
+    if tagged:
+        by_cat = {}
+        for e in tagged:
+            by_cat.setdefault(e["category"], []).append(_score(e))
+        by_hook = {}
+        for e in tagged:
+            if e.get("hook_type"):
+                by_hook.setdefault(e["hook_type"], []).append(_score(e))
+        lines.append("")
+        lines.append("## Average score by category")
+        for cat, vals in sorted(by_cat.items(), key=lambda kv: -sum(kv[1]) / len(kv[1])):
+            lines.append(f"- {cat}: avg {sum(vals)/len(vals):.1f} ({len(vals)} videos)")
+        if by_hook:
+            lines.append("")
+            lines.append("## Average score by hook type")
+            for hook, vals in sorted(by_hook.items(), key=lambda kv: -sum(kv[1]) / len(kv[1])):
+                lines.append(f"- {hook}: avg {sum(vals)/len(vals):.1f} ({len(vals)} videos)")
+
+    lines.append("")
+    lines.append(
+        "## Guidance for new scripts\n"
+        "Favor hooks and subjects similar to the top performers above. "
+        "Avoid repeating the framing of the lowest performers."
+    )
+
+    with open(LEARNINGS_FILE, "w") as f:
+        f.write("\n".join(lines) + "\n")
+    print(f"Wrote learnings from {len(scored)} scored videos to {LEARNINGS_FILE}")
+
+
+def main():
+    entries = load_post_log()
+    if not entries:
+        print("post_log.json empty, nothing to analyze.")
+        return
+    entries = refresh_youtube_stats(entries)
+    entries = refresh_facebook_stats(entries)
+    entries = refresh_instagram_stats(entries)
+    save_post_log(entries)
+    write_learnings(entries)
+
+
+if __name__ == "__main__":
+    main()
