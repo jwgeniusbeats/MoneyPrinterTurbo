@@ -113,6 +113,37 @@ def upload_public_video(video_path: str) -> tuple[str, str]:
     return public_url, object_name
 
 
+def upload_public_file(local_path: str, object_name: str, content_type: str) -> str:
+    """
+    Uploads local_path to GCS at a fixed object_name (not a random uuid) with
+    public-read ACL, and does NOT delete it afterward -- for small static
+    files meant to stay reachable permanently (e.g. a legal/policy page, or
+    a third-party domain-ownership verification file), unlike
+    upload_public_video()'s short-lived temp objects. Returns the public URL.
+    """
+    _ensure_bucket()
+
+    with open(local_path, "rb") as f:
+        file_bytes = f.read()
+
+    headers = _auth_header()
+    headers["Content-Type"] = content_type
+    upload_resp = requests.post(
+        f"https://storage.googleapis.com/upload/storage/v1/b/{BUCKET_NAME}/o",
+        headers=headers,
+        params={"uploadType": "media", "name": object_name, "predefinedAcl": "publicRead"},
+        data=file_bytes,
+        timeout=60,
+    )
+    if not upload_resp.ok:
+        logger.error(f"GCS static-file upload failed {upload_resp.status_code}: {upload_resp.text}")
+    upload_resp.raise_for_status()
+
+    public_url = f"https://storage.googleapis.com/{BUCKET_NAME}/{object_name}"
+    logger.info(f"Uploaded public static file: {public_url}")
+    return public_url
+
+
 def delete_object(object_name: str):
     from urllib.parse import quote
 
