@@ -61,7 +61,9 @@ def upload_video(
     title: str,
     description: str = "",
     tags: Optional[list] = None,
-    category_id: str = "22",
+    category_id: str = "27",  # Education -- more accurate than the old default
+    # (22, People & Blogs) for psychology-facts content, and category feeds
+    # into YouTube's related-video/recommendation matching.
     privacy_status: str = "private",
     publish_at: Optional[str] = None,
     made_for_kids: bool = False,
