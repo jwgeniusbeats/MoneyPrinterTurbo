@@ -202,11 +202,14 @@ def run_batch(topics: list) -> list:
     with open(batch_path, "w") as f:
         for topic in topics:
             # SCRIPT_STYLE_SUFFIX is a script-generation instruction, not part
-            # of the topic's identity -- append it only for this CLI call, so
-            # `topic` itself (used later as title fallback / SEO tag / logged
-            # subject) stays clean human-readable text.
-            entry = {"video_subject": topic + SCRIPT_STYLE_SUFFIX, "video_language": "en-US"}
-            script_prompt_parts = [FOLLOW_CTA_INSTRUCTION]
+            # of the topic's identity -- it goes in video_script_prompt, not
+            # video_subject. video_subject is reused downstream (task.py) as
+            # the title-card and post-title fallback whenever the LLM social-
+            # metadata call fails, so appending instruction text to it used to
+            # leak straight onto the visible video ("...STOP. KEEP THE SCRIPT
+            # SHORT AND" was literally rendered on-screen on a real upload).
+            entry = {"video_subject": topic, "video_language": "en-US"}
+            script_prompt_parts = [FOLLOW_CTA_INSTRUCTION, SCRIPT_STYLE_SUFFIX.strip()]
             if learnings:
                 script_prompt_parts.append(
                     "Here is what has performed well vs. poorly on this channel so far "
