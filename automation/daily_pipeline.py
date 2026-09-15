@@ -187,12 +187,14 @@ def run_batch(topics: list) -> list:
             # `topic` itself (used later as title fallback / SEO tag / logged
             # subject) stays clean human-readable text.
             entry = {"video_subject": topic + SCRIPT_STYLE_SUFFIX, "video_language": "en-US"}
+            script_prompt_parts = [FOLLOW_CTA_INSTRUCTION]
             if learnings:
-                entry["video_script_prompt"] = (
+                script_prompt_parts.append(
                     "Here is what has performed well vs. poorly on this channel so far "
                     "(real view/like data). Favor similar hooks/angles, avoid repeating "
                     f"weak ones:\n\n{learnings}"
                 )
+            entry["video_script_prompt"] = "\n\n".join(script_prompt_parts)
             f.write(json.dumps(entry) + "\n")
 
     result = subprocess.run(
@@ -239,6 +241,18 @@ BACKLOG_REFILL_COUNT = 10
 SCRIPT_STYLE_SUFFIX = (
     " Keep the script short and punchy, about 80-100 words total, "
     "fast hook in the first sentence."
+)
+# A brand-new channel gets very little algorithmic push on YouTube/Instagram
+# (unlike TikTok's cold-start-friendly For You feed, which tests fresh
+# uploads regardless of follower count) -- an explicit spoken follow/subscribe
+# ask in the last line measurably improves follow-through, and no script
+# generated so far has included one at all.
+FOLLOW_CTA_INSTRUCTION = (
+    "End the script with a brief, natural spoken call-to-action to follow the "
+    "account for more psychology facts (e.g. \"Follow for more mind-bending "
+    "psychology facts\" or similar, in your own words matching the script's "
+    "tone) -- don't make it feel like an ad, keep it under 10 words, folded "
+    "naturally into the last sentence rather than tacked on."
 )
 
 
