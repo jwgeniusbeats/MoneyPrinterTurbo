@@ -192,6 +192,8 @@ def next_slot_utc(state: dict) -> datetime:
 
 
 def run_batch(topics: list) -> list:
+    import random
+
     learnings = load_learnings()
     batch_path = os.path.join(BASE_DIR, "automation", "_run_batch.jsonl")
     with open(batch_path, "w") as f:
@@ -205,6 +207,19 @@ def run_batch(topics: list) -> list:
             # SHORT AND" was literally rendered on-screen on a real upload).
             entry = {"video_subject": topic, "video_language": "en-US"}
             script_prompt_parts = [FOLLOW_CTA_INSTRUCTION, SCRIPT_STYLE_SUFFIX.strip()]
+
+            # A different random sample per topic (not the whole fixed list
+            # every time) so a day's 4 videos don't all lean on the same one
+            # or two hook shapes -- see HOOK_PATTERNS above for provenance.
+            sampled_patterns = random.sample(
+                list(HOOK_PATTERNS.items()), k=min(3, len(HOOK_PATTERNS))
+            )
+            pattern_lines = "\n".join(f"- {name}: {desc}" for name, desc in sampled_patterns)
+            script_prompt_parts.append(
+                "Consider opening with one of these proven hook structures if it "
+                f"fits this topic naturally (don't force it):\n{pattern_lines}"
+            )
+
             if learnings:
                 script_prompt_parts.append(
                     "Here is what has performed well vs. poorly on this channel so far "
@@ -271,6 +286,25 @@ FOLLOW_CTA_INSTRUCTION = (
     "tone) -- don't make it feel like an ad, keep it under 10 words, folded "
     "naturally into the last sentence rather than tacked on."
 )
+
+
+# Curated from resources/tiktok-viral-hooks (shixinzhang/tiktok-viral-hooks,
+# MIT-licensed code / CC BY-NC-SA content) -- a hand-picked subset of its
+# 448 structural hook patterns that fit psychology/facts content specifically
+# (the full library skews toward beauty/finance/product-review niches). Only
+# the pattern MECHANIC is described here in our own words, never the
+# library's actual example transcripts, since those are the NC-licensed part.
+HOOK_PATTERNS = {
+    "Myth-Busting": "State a widely-believed claim, then immediately reveal it's wrong.",
+    "Curiosity Gap via Surprising Fact": "Open with a specific, odd fact and withhold the explanation until later in the script.",
+    "Counterintuitive Reframe": "Name the common/expected explanation for something, then flip it to the real, less obvious cause.",
+    "Assumption vs. Reality": "State what people assume is happening, then contrast it with what's actually happening.",
+    "Rhetorical Question with Unexpected Twist": "Ask a question the viewer thinks they know the answer to, then answer it in a way that subverts that.",
+    "Psychological Label Reveal": "Describe a specific relatable behavior first, then name the psychological effect/bias behind it.",
+    "Direct Question Hook": "Open with a direct, specific question aimed at the viewer's own experience (\"Have you ever...\").",
+    "Bold Claim": "Open with a confident, slightly provocative claim that invites a 'wait, really?' reaction.",
+    "Contradiction Hook": "Open with two things that seem to contradict each other, then resolve the tension.",
+}
 
 
 TREND_SEED_PHRASES = [
