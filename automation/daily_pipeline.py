@@ -120,11 +120,6 @@ def load_post_log() -> list:
         return json.load(f)
 
 
-def save_post_log(entries: list):
-    with open(POST_LOG_FILE, "w") as f:
-        json.dump(entries, f, indent=2)
-
-
 def load_backlog() -> list:
     with open(BACKLOG_FILE) as f:
         return json.load(f)
