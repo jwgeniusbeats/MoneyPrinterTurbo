@@ -12,6 +12,51 @@ from app.services import subtitle
 
 
 class TestSubtitleService(unittest.TestCase):
+    def test_correct_with_words_splits_long_clause_without_desyncing(self):
+        """
+        Regression test for the exact bug an earlier audit found: a script
+        clause longer than MAX_SUBTITLE_CLAUSE_WORDS (7) with no internal
+        punctuation gets split into several capped subtitle lines by our own
+        code, but whisper transcribes it as a single segment (it only splits
+        on punctuation). The old text-similarity correct() compared our
+        7-word line against whisper's full 11-word segment, stamped it with
+        the WRONG (too-long) duration, and threw off every subsequent line's
+        pairing for the rest of the video.
+
+        Word-level alignment must not have this failure mode: each capped
+        line should get its OWN correct time range, taken from the words
+        that actually fall inside it, and consecutive lines must not
+        overlap or regress in time.
+        """
+        script = (
+            "This simple trick will change how you think about memory forever."
+        )
+        words_in_order = [
+            "This", "simple", "trick", "will", "change", "how", "you",
+            "think", "about", "memory", "forever",
+        ]
+        words = [
+            {"word": w, "start": round(i * 0.3, 2), "end": round((i + 1) * 0.3, 2)}
+            for i, w in enumerate(words_in_order)
+        ]
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            subtitle_file = Path(tmp_dir) / "subtitle.srt"
+            subtitle_file.write_text("", encoding="utf-8")
+
+            subtitle.correct(str(subtitle_file), script, words=words)
+            items = subtitle.file_to_subtitles(str(subtitle_file))
+
+        self.assertEqual(
+            [item[2] for item in items],
+            ["This simple trick will change how you", "think about memory forever"],
+        )
+        # First line: "you" is words_in_order[6] -> end = 0.3*7 = 2.1s.
+        self.assertIn("00:00:00,000 --> 00:00:02,100", items[0][1])
+        # Second line: "think" is words_in_order[7] -> start = 0.3*7 = 2.1s;
+        # "forever" is words_in_order[10] -> end = 0.3*11 = 3.3s.
+        self.assertIn("00:00:02,100 --> 00:00:03,300", items[1][1])
+
     def test_file_to_subtitles_returns_empty_for_missing_input(self):
         """空路径和不存在的文件都应安全返回空列表。"""
         self.assertEqual(subtitle.file_to_subtitles(""), [])

@@ -1027,7 +1027,7 @@ class TestTaskService(unittest.TestCase):
             word_level=False,
         )
         correct.assert_called_once_with(
-            subtitle_file=subtitle_path, video_script="Hello world."
+            subtitle_file=subtitle_path, video_script="Hello world.", words=None
         )
 
     def test_generate_subtitle_uses_whisper_word_timing_without_correction(self):

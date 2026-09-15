@@ -1,3 +1,4 @@
+import difflib
 import json
 import os.path
 import re
@@ -19,34 +20,51 @@ initial_prompt = config.whisper.get("initial_prompt", "") or None
 model = None
 
 
-def create(audio_file, subtitle_file: str = "", word_level: bool = False):
+def _ensure_model() -> bool:
+    """Assumes WhisperModel is already known to be importable -- callers
+    check that separately, since "dependency not installed" and "model
+    failed to load" are distinct, both-falsy-but-different signals create()
+    returns ("" vs None respectively)."""
     global model
+    if model:
+        return True
+
+    model_path = f"{utils.root_dir()}/models/whisper-{model_size}"
+    model_bin_file = f"{model_path}/model.bin"
+    if not os.path.isdir(model_path) or not os.path.isfile(model_bin_file):
+        model_path = model_size
+
+    logger.info(
+        f"loading model: {model_path}, device: {device}, compute_type: {compute_type}"
+    )
+    try:
+        model = WhisperModel(
+            model_size_or_path=model_path, device=device, compute_type=compute_type
+        )
+        return True
+    except Exception as e:
+        logger.error(
+            f"failed to load model: {e} \n\n"
+            f"********************************************\n"
+            f"this may be caused by network issue. \n"
+            f"please download the model manually and put it in the 'models' folder. \n"
+            f"see [README.md FAQ](https://github.com/harry0703/MoneyPrinterTurbo) for more details.\n"
+            f"********************************************\n\n"
+        )
+        return False
+
+
+def create(audio_file, subtitle_file: str = "", word_level: bool = False):
+    """Transcribes audio_file into subtitle_file (SRT) and ALSO returns the
+    flat per-word timestamps faster-whisper already computes internally
+    (word_timestamps=True) -- reused by correct() below so a
+    subtitle_provider="whisper" + sentence-display run only transcribes the
+    audio once instead of twice."""
     if WhisperModel is None:
         logger.warning("faster_whisper not available, skipping whisper subtitle generation")
         return ""
-    if not model:
-        model_path = f"{utils.root_dir()}/models/whisper-{model_size}"
-        model_bin_file = f"{model_path}/model.bin"
-        if not os.path.isdir(model_path) or not os.path.isfile(model_bin_file):
-            model_path = model_size
-
-        logger.info(
-            f"loading model: {model_path}, device: {device}, compute_type: {compute_type}"
-        )
-        try:
-            model = WhisperModel(
-                model_size_or_path=model_path, device=device, compute_type=compute_type
-            )
-        except Exception as e:
-            logger.error(
-                f"failed to load model: {e} \n\n"
-                f"********************************************\n"
-                f"this may be caused by network issue. \n"
-                f"please download the model manually and put it in the 'models' folder. \n"
-                f"see [README.md FAQ](https://github.com/harry0703/MoneyPrinterTurbo) for more details.\n"
-                f"********************************************\n\n"
-            )
-            return None
+    if not _ensure_model():
+        return None
 
     logger.info(f"start, output file: {subtitle_file}")
     if not subtitle_file:
@@ -67,6 +85,7 @@ def create(audio_file, subtitle_file: str = "", word_level: bool = False):
 
     start = timer()
     subtitles = []
+    words_out = []
 
     def recognized(seg_text, seg_start, seg_end):
         seg_text = seg_text.strip()
@@ -81,6 +100,11 @@ def create(audio_file, subtitle_file: str = "", word_level: bool = False):
         )
 
     for segment in segments:
+        for word in segment.words or []:
+            cleaned = word.word.strip()
+            if cleaned:
+                words_out.append({"word": cleaned, "start": word.start, "end": word.end})
+
         if word_level and segment.words:
             for word in segment.words:
                 cleaned_word = word.word.strip()
@@ -149,6 +173,7 @@ def create(audio_file, subtitle_file: str = "", word_level: bool = False):
     with open(subtitle_file, "w", encoding="utf-8") as f:
         f.write(sub)
     logger.info(f"subtitle file created: {subtitle_file}")
+    return words_out
 
 
 def file_to_subtitles(filename):
@@ -206,7 +231,86 @@ def similarity(a, b):
     return 1 - (distance / max_length)
 
 
-def correct(subtitle_file, video_script):
+def _normalize_word_for_alignment(word: str) -> str:
+    return re.sub(r"[^\w']", "", word).lower()
+
+
+def _correct_from_words(subtitle_file, video_script, words: list):
+    """Rebuilds the subtitle file straight from per-word whisper timestamps
+    instead of fuzzy-matching whole lines of text.
+
+    Why: the old text-similarity approach (still available below as the
+    fallback when `words` isn't supplied) compares each of OUR OWN script
+    clauses -- capped at MAX_SUBTITLE_CLAUSE_WORDS, see
+    utils._cap_clause_word_count() -- against whisper's own independently
+    punctuation-segmented output. Those two segmentations diverge on any
+    clause longer than the cap with no internal punctuation (whisper keeps
+    it as one segment; we split it into several), which desyncs every
+    subsequent line for the rest of the video. Aligning at WORD granularity
+    sidesteps that entirely: our clause boundaries are just an index range
+    into the same underlying word sequence whisper transcribed, so this
+    only needs to find where each of our words landed in whisper's word
+    list, never to reconcile two different sentence-boundary choices.
+    """
+    normalized_script = utils.normalize_script_for_subtitle_matching(video_script)
+    script_lines = utils.split_string_by_punctuations(normalized_script)
+
+    clause_word_lists = [line.split() for line in script_lines if line.strip()]
+    script_words = []
+    clause_ranges = []
+    for word_list in clause_word_lists:
+        start = len(script_words)
+        script_words.extend(word_list)
+        clause_ranges.append((start, len(script_words)))
+
+    norm_script = [_normalize_word_for_alignment(w) for w in script_words]
+    norm_whisper = [_normalize_word_for_alignment(w["word"]) for w in words]
+
+    matcher = difflib.SequenceMatcher(None, norm_script, norm_whisper, autojunk=False)
+    idx_map = {}
+    for block in matcher.get_matching_blocks():
+        for k in range(block.size):
+            # An empty normalized token (whisper words that are pure
+            # punctuation, e.g. "--") can spuriously "match" another empty
+            # token -- never trust an empty-string match for timing.
+            if norm_script[block.a + k]:
+                idx_map[block.a + k] = block.b + k
+
+    lines = []
+    last_end_time = 0.0
+    for line_text, (start_idx, end_idx) in zip(script_lines, clause_ranges):
+        if not line_text.strip():
+            continue
+
+        matched_positions = [
+            idx_map[i] for i in range(start_idx, end_idx) if i in idx_map
+        ]
+        if matched_positions:
+            start_time = words[min(matched_positions)]["start"]
+            end_time = words[max(matched_positions)]["end"]
+        else:
+            # No word in this clause matched anywhere in the whisper
+            # transcript (e.g. a heavily mispronounced/garbled clause) --
+            # place it right after the previous clause rather than at
+            # 00:00:00, so it doesn't visually jump to the start of the
+            # video. A short, arbitrary but bounded placeholder duration.
+            logger.warning(f"No whisper alignment found for clause: {line_text!r}")
+            start_time = last_end_time
+            end_time = last_end_time + max(0.5, 0.3 * len(line_text.split()))
+
+        lines.append(utils.text_to_srt(len(lines) + 1, line_text, start_time, end_time))
+        last_end_time = end_time
+
+    with open(subtitle_file, "w", encoding="utf-8") as fd:
+        fd.write("\n".join(lines) + "\n")
+    logger.info(f"Subtitle corrected via word-level alignment ({len(lines)} lines)")
+
+
+def correct(subtitle_file, video_script, words: list | None = None):
+    if words:
+        _correct_from_words(subtitle_file, video_script, words)
+        return
+
     subtitle_items = file_to_subtitles(subtitle_file)
     normalized_script = utils.normalize_script_for_subtitle_matching(video_script)
     script_lines = utils.split_string_by_punctuations(normalized_script)

@@ -618,14 +618,23 @@ def generate_subtitle(task_id, params, video_script, sub_maker, audio_file):
             return ""
 
     if subtitle_provider == "whisper":
-        subtitle.create(
+        whisper_words = subtitle.create(
             audio_file=audio_file,
             subtitle_file=subtitle_path,
             word_level=is_word_level,
         )
         if not is_word_level:
             logger.info("\n\n## correcting subtitle")
-            subtitle.correct(subtitle_file=subtitle_path, video_script=video_script)
+            # whisper_words (per-word timestamps, a byproduct create() already
+            # computes) lets correct() align at word granularity instead of
+            # fuzzy-matching whole lines -- see _correct_from_words() for why
+            # that matters. Falls back to the old text-based correction if
+            # create() failed to return anything (e.g. model load error).
+            subtitle.correct(
+                subtitle_file=subtitle_path,
+                video_script=video_script,
+                words=whisper_words,
+            )
 
     subtitle_lines = subtitle.file_to_subtitles(subtitle_path)
     if not subtitle_lines:
