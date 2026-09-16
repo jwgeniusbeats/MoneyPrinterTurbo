@@ -200,6 +200,7 @@ def run_batch(topics: list) -> list:
 
     learnings = load_learnings()
     batch_path = os.path.join(BASE_DIR, "automation", "_run_batch.jsonl")
+    subtitle_modes = []  # parallel to `topics`, so succeeded[] can log which mode each video got
     with open(batch_path, "w") as f:
         for topic in topics:
             # SCRIPT_STYLE_SUFFIX is a script-generation instruction, not part
@@ -209,7 +210,23 @@ def run_batch(topics: list) -> list:
             # metadata call fails, so appending instruction text to it used to
             # leak straight onto the visible video ("...STOP. KEEP THE SCRIPT
             # SHORT AND" was literally rendered on-screen on a real upload).
-            entry = {"video_subject": topic, "video_language": "en-US"}
+            # A/B test: 50/50 per video between the default sentence-by-
+            # sentence subtitles and word-by-word with spring animation
+            # (new in v1.3.7). Uncertain which helps THIS channel (dense
+            # factual content vs. word-by-word's fast/hype-coded pacing),
+            # so split evenly and let analyze_performance.py's real
+            # retention data settle it instead of guessing -- see
+            # subtitle_display_mode logged on log_entry below.
+            subtitle_display_mode = random.choice(["sentence", "word_by_word"])
+            subtitle_modes.append(subtitle_display_mode)
+            entry = {
+                "video_subject": topic,
+                "video_language": "en-US",
+                "subtitle_display_mode": subtitle_display_mode,
+                "subtitle_animation": (
+                    "pop_spring" if subtitle_display_mode == "word_by_word" else "none"
+                ),
+            }
             script_prompt_parts = [FOLLOW_CTA_INSTRUCTION, SCRIPT_STYLE_SUFFIX.strip()]
 
             # A different random sample per topic (not the whole fixed list
@@ -287,6 +304,7 @@ def run_batch(topics: list) -> list:
                     "script": r["script"],
                     "final_video": r["videos"][0],
                     "combined_video": r["combined_videos"][0] if r.get("combined_videos") else None,
+                    "subtitle_display_mode": subtitle_modes[task["index"] - 1],
                 }
             )
     return succeeded
@@ -524,6 +542,10 @@ def main():
             "subject": subject,
             "posted_at": datetime.now(timezone.utc).isoformat(),
             "platforms": {},
+            # A/B test tag (see run_batch()) -- lets analyze_performance.py
+            # eventually compare retention between the two subtitle styles
+            # once enough videos of each have real data.
+            "subtitle_display_mode": item.get("subtitle_display_mode"),
         }
 
         try:
