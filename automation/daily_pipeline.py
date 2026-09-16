@@ -428,7 +428,13 @@ def retry_failed_platforms(post_log: list):
     was blocked on a previous run (e.g. the Meta/Google account suspensions
     of 2026-09-13/14) — catches the pipeline back up automatically instead of
     leaving posts stuck until someone notices and retries by hand."""
-    any_retried = False
+    # task_id -> {platform_key: new_platform_dict}, only for platforms this
+    # call actually retried -- NOT a snapshot of every entry's full platforms
+    # dict. A full-dict snapshot merged back later would silently overwrite
+    # any other platform key (e.g. tiktok) that the independently-scheduled
+    # tiktok-daily-post / mark_tiktok_posted.py flipped to "live" while these
+    # (slow, network-bound) retries were still running.
+    retried_updates = {}
     for entry in post_log:
         video_path = entry.get("video_path")
         if not video_path or not os.path.exists(video_path):
@@ -436,6 +442,7 @@ def retry_failed_platforms(post_log: list):
         title = entry.get("title", entry.get("subject", ""))
         description = entry.get("description", "")
         platforms = entry.get("platforms", {})
+        task_id = entry.get("task_id")
 
         yt = platforms.get("youtube", {})
         if yt.get("status") in RETRYABLE_STATUSES:
@@ -444,9 +451,11 @@ def retry_failed_platforms(post_log: list):
                     video_path=video_path, title=title, description=description,
                     privacy_status="public",
                 )
-                platforms["youtube"] = {"id": yt_result.get("id"), "status": "live"}
+                new_yt = {"id": yt_result.get("id"), "status": "live"}
+                platforms["youtube"] = new_yt
                 print(f"Retry OK: YouTube for {title!r}")
-                any_retried = True
+                if task_id:
+                    retried_updates.setdefault(task_id, {})["youtube"] = new_yt
                 try:
                     extract_and_set_thumbnail(yt_result["id"], video_path)
                 except Exception as thumb_e:
@@ -460,9 +469,11 @@ def retry_failed_platforms(post_log: list):
                 fb_result = meta_api.upload_facebook_video(
                     video_path=video_path, title=title, description=description,
                 )
-                platforms["facebook"] = {"id": fb_result.get("id"), "status": "live"}
+                new_fb = {"id": fb_result.get("id"), "status": "live"}
+                platforms["facebook"] = new_fb
                 print(f"Retry OK: Facebook for {title!r}")
-                any_retried = True
+                if task_id:
+                    retried_updates.setdefault(task_id, {})["facebook"] = new_fb
             except Exception as e:
                 print(f"Retry still failing: Facebook for {title!r}: {e}")
 
@@ -470,26 +481,28 @@ def retry_failed_platforms(post_log: list):
         if ig.get("status") in RETRYABLE_STATUSES:
             try:
                 ig_result = instagram_api.upload_reel_via_url(video_path=video_path, caption=description)
-                platforms["instagram"] = {"id": ig_result.get("id"), "status": "live"}
+                new_ig = {"id": ig_result.get("id"), "status": "live"}
+                platforms["instagram"] = new_ig
                 print(f"Retry OK: Instagram for {title!r}")
-                any_retried = True
+                if task_id:
+                    retried_updates.setdefault(task_id, {})["instagram"] = new_ig
             except Exception as e:
                 print(f"Retry still failing: Instagram for {title!r}: {e}")
 
-    if any_retried:
+    if retried_updates:
         # Merge into a freshly-read copy under lock instead of overwriting
         # with this possibly-stale in-memory list -- retrying involves slow
         # network calls, during which the concurrent tiktok-daily-post task
         # (running on its own fixed schedule, independent of this run) could
         # have appended or updated other entries via mark_tiktok_posted.py.
-        retried_platforms_by_task_id = {
-            e["task_id"]: e["platforms"] for e in post_log if e.get("task_id")
-        }
+        # Only the specific platform keys that were retried are applied, so
+        # any other platform key (tiktok's status/stats) written concurrently
+        # onto fresh_log during this run is preserved untouched.
         with locked_post_log() as fresh_log:
             for entry in fresh_log:
-                tid = entry.get("task_id")
-                if tid in retried_platforms_by_task_id:
-                    entry["platforms"] = retried_platforms_by_task_id[tid]
+                updates = retried_updates.get(entry.get("task_id"))
+                if updates:
+                    entry.setdefault("platforms", {}).update(updates)
 
 
 def main():
