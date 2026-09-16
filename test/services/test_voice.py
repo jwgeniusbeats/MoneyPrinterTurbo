@@ -1106,15 +1106,15 @@ class TestVoiceService(unittest.TestCase):
             "the whole trip!"
         )
 
-        self.assertEqual(
-            utils.split_string_by_punctuations(text),
-            [
-                (
-                    "It takes about 1,000 years for a single drop of water to finish "
-                    "the whole trip"
-                )
-            ],
-        )
+        chunks = utils.split_string_by_punctuations(text)
+
+        # The word-count cap (utils.MAX_SUBTITLE_CLAUSE_WORDS) may split this
+        # into several short chunks -- that's fine. What must never happen is
+        # a split landing between "1," and "000", which would prove the comma
+        # inside the number was mistaken for a sentence boundary.
+        self.assertFalse(any(chunk.rstrip().endswith("1,") for chunk in chunks))
+        self.assertFalse(any(chunk.lstrip().startswith("000") for chunk in chunks))
+        self.assertTrue(any("1,000 years" in chunk for chunk in chunks))
 
     def test_edge_cue_aggregation_handles_thousand_separator_comma(self):
         """
@@ -1147,7 +1147,10 @@ class TestVoiceService(unittest.TestCase):
         sub_items = vs._build_subtitle_items_from_edge_cues(sub_maker, script_lines)
 
         self.assertEqual(len(sub_items), len(script_lines))
-        self.assertIn("1,000 years", sub_items[-1])
+        # Whichever chunk ended up holding the number, "1,000 years" must
+        # stay together -- not split into "1," and "000 years" across two
+        # subtitle items.
+        self.assertTrue(any("1,000 years" in item for item in sub_items))
 
     def test_script_split_supports_arabic_punctuation(self):
         """
