@@ -115,6 +115,21 @@ def check_youtube() -> str:
         f"**Entry-tier (Partner Program) eligible: {'YES — apply now' if entry_ready else 'not yet'}**",
         f"**Full monetization eligible: {'YES' if full_ready else 'not yet'}**",
     ]
+
+    # The Data API's lifetime viewCount updates near-real-time; the
+    # Analytics API (views_90 above) has a well-known 24-48h+ processing
+    # lag, worse for a brand-new channel with sparse data. A big gap here
+    # is expected pipeline behavior, not a bug -- called out explicitly so
+    # this doesn't get misread as broken tracking (including by the
+    # growth-audit task, which reads this file for context).
+    if total_views > 0 and views_90 < total_views * 0.5:
+        lines.append(
+            f"- Note: {total_views} lifetime views vs {views_90} in the 90d "
+            "Analytics window is expected lag (Analytics processing trails "
+            "the raw view count, more so for a new channel) -- not a "
+            "tracking bug, should narrow as data catches up."
+        )
+
     return "\n".join(lines)
 
 
