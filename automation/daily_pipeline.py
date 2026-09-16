@@ -357,6 +357,7 @@ HOOK_PATTERNS = {
     "Direct Question Hook": "Open with a direct, specific question aimed at the viewer's own experience (\"Have you ever...\").",
     "Bold Claim": "Open with a confident, slightly provocative claim that invites a 'wait, really?' reaction.",
     "Contradiction Hook": "Open with two things that seem to contradict each other, then resolve the tension.",
+    "Provocative Paradox": "Name a trait or behavior people see as purely good (honesty, kindness, wisdom), then reveal the hidden cost it carries.",
 }
 
 
