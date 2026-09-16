@@ -155,7 +155,8 @@ def main():
         subject=" ".join(titles)[:100],
         title=meta["title"],
         category=top_category,
-        hashtags=["#psychology", "#compilation", "#shorts"],
+        hashtags=["#psychology", "#compilation"],
+        is_short=False,
     )
     print(f"Uploading compilation: {meta['title']!r}")
     yt_result = youtube_api.upload_video(

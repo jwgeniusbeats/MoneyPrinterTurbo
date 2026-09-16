@@ -59,17 +59,28 @@ CATEGORY_KEYWORDS = {
 }
 
 
-def build_seo_tags(subject: str, title: str, category: str, hashtags: list) -> list:
+def build_seo_tags(
+    subject: str, title: str, category: str, hashtags: list, is_short: bool = True
+) -> list:
     """YouTube tags work better as natural search phrases than as reused
     hashtags (a bare '#dejavu' is a worse search tag than 'deja vu
     psychology') -- this builds a richer, de-duped tag list instead of just
-    passing the caption hashtags through as-is."""
+    passing the caption hashtags through as-is.
+
+    is_short=False for weekly_compilation.py's long-form bundles: they're
+    5-7 minutes and the entire point of making them is to earn long-form
+    watch-hours toward Partner Program (see that file's docstring) -- a
+    'shorts' tag baked in here would mislabel that video's format to
+    YouTube's own systems, working against the reason the compilation
+    exists at all."""
     tags = [h.lstrip("#") for h in hashtags if h.lstrip("#")]
     tags.append(subject[:100])
     tags.append(title[:100])
     if category and category != "general":
         tags.append(category.replace("_", " "))
-    tags.extend(["psychology facts", "mind facts", "psychology", "shorts"])
+    tags.extend(["psychology facts", "mind facts", "psychology"])
+    if is_short:
+        tags.append("shorts")
 
     seen = set()
     deduped = []
