@@ -1673,6 +1673,18 @@ _TITLE_CARD_PALETTES = [
     ((30, 64, 175, 235), (250, 204, 21, 255)),   # deep blue / gold
 ]
 
+# Same reasoning as _TITLE_CARD_PALETTES -- every title card also used the
+# same single font. Anton and Bebas Neue (SIL Open Font License, safe for
+# monetized use; resource/fonts/licenses/ has both OFL.txt copies) are
+# real, widely-used YouTube/TikTok thumbnail display faces, fetched from
+# Google's official font repo. Kept the original BeVietnamPro-Bold in the
+# rotation too rather than replacing it.
+_TITLE_CARD_FONTS = [
+    "BeVietnamPro-Bold.ttf",
+    "Anton-Regular.ttf",
+    "BebasNeue-Regular.ttf",
+]
+
 
 def _draw_title_card_image(
     text: str,
@@ -1817,9 +1829,10 @@ def prepend_title_card(
             )
 
         accent, highlight_color = random.choice(_TITLE_CARD_PALETTES)
+        font_path = os.path.join(utils.font_dir(), random.choice(_TITLE_CARD_FONTS))
         overlay_image = _draw_title_card_image(
             title_text, clip.w, clip.h, transparent_bg=True,
-            accent=accent, highlight_color=highlight_color,
+            accent=accent, highlight_color=highlight_color, font_path=font_path,
         )
         overlay_clip = ImageClip(overlay_image, duration=card_duration).with_position(
             ("center", "center")
