@@ -358,6 +358,7 @@ HOOK_PATTERNS = {
     "Bold Claim": "Open with a confident, slightly provocative claim that invites a 'wait, really?' reaction.",
     "Contradiction Hook": "Open with two things that seem to contradict each other, then resolve the tension.",
     "Provocative Paradox": "Name a trait or behavior people see as purely good (honesty, kindness, wisdom), then reveal the hidden cost it carries.",
+    "Keyword Stack": "Open with a rapid-fire string of 3-4 trending psychology/relationship buzzwords, then land on one universal question tying them together.",
 }
 
 
