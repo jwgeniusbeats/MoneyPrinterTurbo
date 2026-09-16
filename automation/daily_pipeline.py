@@ -34,6 +34,10 @@ MANUAL_REMINDER_FILE = os.path.join(BASE_DIR, "automation", "manual_post_queue.t
 POST_LOG_FILE = os.path.join(BASE_DIR, "automation", "post_log.json")
 LEARNINGS_FILE = os.path.join(BASE_DIR, "automation", "learnings.md")
 VIDEOS_PER_RUN = 4
+# Must match app.models.schema.VideoParams.video_script_prompt's
+# Field(max_length=...) exactly -- see run_batch() for why going over this
+# is a same-day full-batch outage, not a per-entry warning.
+MAX_VIDEO_SCRIPT_PROMPT_LENGTH = 2000
 # Link-in-bio page (all platform links + email capture) -- every post should
 # drive traffic there, not just the bio itself, since that's the one owned
 # asset that doesn't depend on any single platform's algorithm or payout
@@ -220,13 +224,33 @@ def run_batch(topics: list) -> list:
                 f"fits this topic naturally (don't force it):\n{pattern_lines}"
             )
 
+            # VideoParams.video_script_prompt has a hard pydantic
+            # max_length=2000 -- this isn't a soft truncation applied later,
+            # it's a validation error that rejects cli.py's ENTIRE batch
+            # file (not just the offending entry) with "invalid CLI batch
+            # input", silently producing 0 videos for the whole day. Found
+            # 2026-09-16: FOLLOW_CTA + SCRIPT_STYLE_SUFFIX + hook patterns
+            # (~875 chars, fixed) plus learnings.md (grows over time as
+            # analyze_performance.py accumulates more data -- already at
+            # ~2000 chars on its own) blew past 2000 combined and took down
+            # that day's entire run. Learnings is the part that grows
+            # unboundedly, so it's the one truncated to fit, never the
+            # fixed instruction parts above.
+            fixed_prompt = "\n\n".join(script_prompt_parts)
             if learnings:
-                script_prompt_parts.append(
+                learnings_header = (
                     "Here is what has performed well vs. poorly on this channel so far "
                     "(real view/like data). Favor similar hooks/angles, avoid repeating "
-                    f"weak ones:\n\n{learnings}"
+                    "weak ones:\n\n"
                 )
+                budget = MAX_VIDEO_SCRIPT_PROMPT_LENGTH - len(fixed_prompt) - len("\n\n") - len(learnings_header)
+                if budget > 100:  # not worth appending a learnings scrap smaller than this
+                    script_prompt_parts.append(learnings_header + learnings[:budget])
+
             entry["video_script_prompt"] = "\n\n".join(script_prompt_parts)
+            assert len(entry["video_script_prompt"]) <= MAX_VIDEO_SCRIPT_PROMPT_LENGTH, (
+                f"video_script_prompt still over budget: {len(entry['video_script_prompt'])} chars"
+            )
             f.write(json.dumps(entry) + "\n")
 
     result = subprocess.run(
