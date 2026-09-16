@@ -1658,6 +1658,21 @@ _TITLE_CARD_HIGHLIGHT_WORDS = {
     "wrong", "lie", "lies", "myth", "scary", "dangerous", "toxic",
 }
 
+# Every title card used the same brand-purple box regardless of topic --
+# every video in the feed ended up looking like one long series instead of
+# distinct posts. One of these (accent, highlight) pairs is picked at random
+# per video in prepend_title_card() instead. Each highlight color is chosen
+# for contrast against its own accent (a highlight that reads fine on purple
+# can be unreadable on amber), and the purple original is kept as one of the
+# options rather than replaced, since it's the actual brand color.
+_TITLE_CARD_PALETTES = [
+    ((108, 59, 244, 235), (255, 214, 0, 255)),   # brand purple / yellow
+    ((13, 148, 136, 235), (255, 214, 0, 255)),   # teal / yellow
+    ((220, 38, 38, 235), (255, 221, 89, 255)),   # crimson / warm gold
+    ((180, 83, 9, 235), (255, 241, 143, 255)),   # amber / pale yellow
+    ((30, 64, 175, 235), (250, 204, 21, 255)),   # deep blue / gold
+]
+
 
 def _draw_title_card_image(
     text: str,
@@ -1666,6 +1681,8 @@ def _draw_title_card_image(
     background_frame=None,
     font_path: str | None = None,
     transparent_bg: bool = False,
+    accent: tuple[int, int, int, int] | None = None,
+    highlight_color: tuple[int, int, int, int] | None = None,
 ) -> np.ndarray:
     """Render a title-card text layer: bold headline styled like a feed
     thumbnail (accent-colored highlight bars behind wrapped text lines)
@@ -1703,8 +1720,8 @@ def _draw_title_card_image(
     line_height = text_height / max(len(lines), 1)
 
     draw = ImageDraw.Draw(base, "RGBA")
-    accent = (108, 59, 244, 235)  # brand purple, matches the logo
-    highlight_color = (255, 214, 0, 255)  # yellow accent for the punchy word(s)
+    accent = accent or (108, 59, 244, 235)  # brand purple, matches the logo
+    highlight_color = highlight_color or (255, 214, 0, 255)  # yellow accent for punchy word(s)
     white = (255, 255, 255, 255)
     pad_x, pad_y = int(fontsize * 0.35), int(fontsize * 0.16)
     start_y = int(height * 0.12)
@@ -1799,8 +1816,10 @@ def prepend_title_card(
                 [vfx.Loop(duration=card_duration)]
             )
 
+        accent, highlight_color = random.choice(_TITLE_CARD_PALETTES)
         overlay_image = _draw_title_card_image(
-            title_text, clip.w, clip.h, transparent_bg=True
+            title_text, clip.w, clip.h, transparent_bg=True,
+            accent=accent, highlight_color=highlight_color,
         )
         overlay_clip = ImageClip(overlay_image, duration=card_duration).with_position(
             ("center", "center")
