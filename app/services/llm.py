@@ -286,7 +286,8 @@ def _track_gemini_call(llm_provider: str):
         logger.debug(f"gemini quota tracking failed (non-fatal): {e}")
 
 
-def _generate_response(prompt: str, app_config=None) -> str:
+def _generate_response(prompt: str, app_config=None, _allow_fallback: bool = True) -> str:
+    llm_provider = None
     try:
         # WebUI 在视频生成期间允许用户准备下一条文案。调用方可以传入提交瞬间
         # 的配置快照，确保模型请求重试期间不会因为后台任务结束并应用新配置，
@@ -664,7 +665,20 @@ def _generate_response(prompt: str, app_config=None) -> str:
             )
 
     except Exception as e:
-        return f"Error: {_sanitize_error_message(e)}"
+        sanitized = _sanitize_error_message(e)
+        if _allow_fallback and llm_provider == "gemini":
+            runtime_app_config = app_config if app_config is not None else config.app
+            groq_key = str(runtime_app_config.get("groq_api_key", "")).strip()
+            if groq_key:
+                logger.warning(
+                    f"gemini failed ({sanitized}), falling back to groq"
+                )
+                fallback_config = dict(runtime_app_config)
+                fallback_config["llm_provider"] = "groq"
+                return _generate_response(
+                    prompt, app_config=fallback_config, _allow_fallback=False
+                )
+        return f"Error: {sanitized}"
 
 
 def test_connection() -> tuple[bool, str, float]:

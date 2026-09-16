@@ -840,6 +840,83 @@ class TestLiteLLMProvider(unittest.TestCase):
         self.assertEqual(captured["config"].max_output_tokens, 2048)
         self.assertTrue(captured["closed"])
 
+    def test_gemini_failure_falls_back_to_groq_when_key_configured(self):
+        """Gemini 请求失败且已配置 Groq key 时，应自动切换到 Groq 重试。"""
+        config.app.update(
+            {
+                "llm_provider": "gemini",
+                "gemini_api_key": "gemini-test-key",
+                "gemini_base_url": "",
+                "gemini_model_name": "gemini-test-model",
+                "groq_api_key": "groq-test-key",
+                "groq_base_url": "",
+                "groq_model_name": "",
+            }
+        )
+
+        class FakeClient:
+            def __init__(self, **kwargs):
+                raise Exception(
+                    "503 UNAVAILABLE. currently experiencing high demand"
+                )
+
+        class FakeCompletions:
+            def create(self, **kwargs):
+                self.kwargs = kwargs
+                message = types.SimpleNamespace(content="hello\ngroq")
+                choice = types.SimpleNamespace(message=message)
+                return types.SimpleNamespace(choices=[choice])
+
+        fake_completions = FakeCompletions()
+        fake_openai_client = types.SimpleNamespace(
+            chat=types.SimpleNamespace(completions=fake_completions)
+        )
+
+        with (
+            patch("google.genai.Client", FakeClient),
+            patch.object(
+                llm, "OpenAI", return_value=fake_openai_client
+            ) as fake_openai_cls,
+            patch.object(llm, "ChatCompletion", types.SimpleNamespace),
+        ):
+            result = llm._generate_response("Say hello")
+
+        self.assertEqual(result, "hello\ngroq")
+        fake_openai_cls.assert_called_once_with(
+            api_key="groq-test-key", base_url="https://api.groq.com/openai/v1"
+        )
+        self.assertEqual(
+            fake_completions.kwargs,
+            {
+                "model": "openai/gpt-oss-120b",
+                "messages": [{"role": "user", "content": "Say hello"}],
+            },
+        )
+
+    def test_gemini_failure_without_groq_key_returns_error(self):
+        """未配置 Groq key 时，Gemini 失败应保持原有错误返回，不做回退。"""
+        config.app.update(
+            {
+                "llm_provider": "gemini",
+                "gemini_api_key": "gemini-test-key",
+                "gemini_base_url": "",
+                "gemini_model_name": "gemini-test-model",
+                "groq_api_key": "",
+            }
+        )
+
+        class FakeClient:
+            def __init__(self, **kwargs):
+                raise Exception("503 UNAVAILABLE")
+
+        with patch("google.genai.Client", FakeClient), patch.object(
+            llm, "OpenAI"
+        ) as fake_openai_cls:
+            result = llm._generate_response("Say hello")
+
+        fake_openai_cls.assert_not_called()
+        self.assertTrue(result.startswith("Error: "))
+
     def test_cloudflare_requires_account_id_before_request(self):
         """Cloudflare 缺少 Account ID 时应在本地失败，不发送无效请求。"""
         config.app.update(

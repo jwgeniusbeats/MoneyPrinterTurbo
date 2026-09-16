@@ -442,8 +442,9 @@ LLM_PROVIDER_REGISTRY = (
         "groq",
         "Groq",
         api_key_url="https://console.groq.com/keys",
-        default_model="llama-3.3-70b-versatile",
+        default_model="openai/gpt-oss-120b",
         default_base_url="https://api.groq.com/openai/v1",
+        deprecated_models=("llama-3.3-70b-versatile",),
     ),
     LLMProviderSpec(
         "pollinations",
