@@ -187,7 +187,11 @@ def file_to_subtitles(filename):
     with open(filename, "r", encoding="utf-8") as f:
         for line in f:
             times = re.findall("([0-9]*:[0-9]*:[0-9]*,[0-9]*)", line)
-            if times:
+            # A timestamp-looking string can appear inside a cue's own text
+            # (e.g. spoken narration referencing a time). Only treat it as
+            # the cue's timing line when we're not already inside one --
+            # otherwise it would silently overwrite the real timing.
+            if times and current_times is None:
                 current_times = line
             elif line.strip() == "" and current_times:
                 index += 1

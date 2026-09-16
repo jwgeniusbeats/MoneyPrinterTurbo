@@ -293,6 +293,33 @@ class TestSubtitleService(unittest.TestCase):
 
         self.assertEqual([item[2] for item in items], ["Hello", "World"])
 
+    def test_file_to_subtitles_ignores_timestamp_like_text_inside_a_cue(self):
+        """
+        A timestamp-shaped string inside a cue's own narration (e.g. spoken
+        text referencing a time) must not be mistaken for the cue's real
+        timing line and overwrite it.
+        """
+        srt_with_embedded_timestamp = (
+            "1\n"
+            "00:00:00,000 --> 00:00:03,000\n"
+            "Jump to 00:01:23,456 in the video for proof.\n\n"
+            "2\n"
+            "00:00:03,000 --> 00:00:05,000\n"
+            "Second line\n\n"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            subtitle_file = Path(tmp_dir) / "subtitle.srt"
+            subtitle_file.write_text(srt_with_embedded_timestamp, encoding="utf-8")
+
+            items = subtitle.file_to_subtitles(str(subtitle_file))
+
+        self.assertEqual(len(items), 2)
+        self.assertEqual(items[0][1], "00:00:00,000 --> 00:00:03,000")
+        self.assertEqual(items[0][2], "Jump to 00:01:23,456 in the video for proof.")
+        self.assertEqual(items[1][1], "00:00:03,000 --> 00:00:05,000")
+        self.assertEqual(items[1][2], "Second line")
+
 
 if __name__ == "__main__":
     unittest.main()
