@@ -1404,8 +1404,9 @@ def generate_video(
         if params.subtitle_position == "bottom":
             # 0.95 puts subtitles inside the safe-area TikTok/Reels/Shorts
             # reserve for their own share/caption UI (~12-15% of height) --
-            # 0.83 keeps them clear of it on 9:16 video.
-            _clip = _clip.with_position(("center", video_height * 0.83 - _clip.h))
+            # 0.78 keeps them clear of it on 9:16 video with a bit more
+            # headroom than 0.83 (moved up slightly per user feedback).
+            _clip = _clip.with_position(("center", video_height * 0.78 - _clip.h))
         elif params.subtitle_position == "top":
             _clip = _clip.with_position(("center", video_height * 0.05))
         elif params.subtitle_position in ("two_thirds_bottom", "two_thirds", "2/3_bottom"):

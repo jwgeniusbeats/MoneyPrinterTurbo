@@ -524,9 +524,9 @@ class TestVoiceService(unittest.TestCase):
         self.assertTrue(Path(voice_file).is_file())
         self.assertEqual(
             getattr(sub_maker, "subs", []),
-            ["Gemini subtitle generation should work now", "Testing multiple lines"],
+            ["Gemini subtitle generation should work", "now", "Testing multiple lines"],
         )
-        self.assertEqual(len(getattr(sub_maker, "offset", [])), 2)
+        self.assertEqual(len(getattr(sub_maker, "offset", [])), 3)
         self.assertEqual(sub_maker.offset[0][0], 0)
         self.assertLess(sub_maker.offset[0][1], sub_maker.offset[1][1])
         self.assertEqual(captured["client_kwargs"], {"api_key": "test-key"})
@@ -542,7 +542,8 @@ class TestVoiceService(unittest.TestCase):
 
         vs.create_subtitle(sub_maker=sub_maker, text=text, subtitle_file=subtitle_file)
         subtitle_content = Path(subtitle_file).read_text(encoding="utf-8")
-        self.assertIn("Gemini subtitle generation should work now", subtitle_content)
+        self.assertIn("Gemini subtitle generation should work", subtitle_content)
+        self.assertIn("now", subtitle_content)
         self.assertIn("Testing multiple lines", subtitle_content)
 
     def test_mimo_tts_uses_openai_compatible_audio_response(self):
@@ -1090,7 +1091,8 @@ class TestVoiceService(unittest.TestCase):
             self.assertTrue(Path(subtitle_path).exists())
             self.assertFalse(whisper_create.called)
             subtitle_content = Path(subtitle_path).read_text(encoding="utf-8")
-            self.assertIn("Gemini subtitle generation should work now", subtitle_content)
+            self.assertIn("Gemini subtitle generation should work", subtitle_content)
+            self.assertIn("now", subtitle_content)
             self.assertIn("Testing multiple lines", subtitle_content)
 
     def test_script_split_keeps_thousand_separator_comma(self):

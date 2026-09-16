@@ -320,7 +320,7 @@ def str_contains_punctuation(word):
     return False
 
 
-MAX_SUBTITLE_CLAUSE_WORDS = 7
+MAX_SUBTITLE_CLAUSE_WORDS = 5  # was 7 -- shortened per user feedback
 
 
 def _cap_clause_word_count(clause: str, max_words: int = MAX_SUBTITLE_CLAUSE_WORDS) -> list:
