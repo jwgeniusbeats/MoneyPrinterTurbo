@@ -314,6 +314,8 @@ def _ffmpeg_encoder_exists(ffmpeg_binary: str, codec: str) -> bool:
             [ffmpeg_binary, "-hide_banner", "-encoders"],
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             check=False,
             timeout=10,
         )
@@ -474,7 +476,9 @@ def _run_concat_with_heartbeat(command: list[str], output_file: str):
     reporter = threading.Thread(target=log_heartbeat, daemon=True)
     reporter.start()
     try:
-        return subprocess.run(command, capture_output=True, text=True, check=False)
+        return subprocess.run(
+            command, capture_output=True, text=True, encoding="utf-8", errors="replace", check=False
+        )
     finally:
         stop_event.set()
 
