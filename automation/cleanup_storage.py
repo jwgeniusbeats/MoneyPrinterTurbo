@@ -26,6 +26,7 @@ Intended to run daily (e.g. appended to the daily_pipeline cron) or by hand.
 """
 import argparse
 import os
+import re
 import shutil
 import sys
 import time
@@ -38,6 +39,21 @@ from app.services import cache_manager  # noqa: E402
 STORAGE_TASKS_DIR = os.path.join(BASE_DIR, "storage", "tasks")
 VIDEOS_DIR = os.path.join(BASE_DIR, "Videos")
 MIN_AGE_DAYS = 2
+# Real task folders are always named after a uuid4() (see app/utils/utils.py,
+# app/services/task.py). storage/tasks/ also holds unrelated, non-task
+# folders used as persistent fallback/state dirs by various generation
+# services -- e.g. elevenlabs-fallback, sonilo-task, seedance-unconfirmed,
+# test-wavespeed-* (confirmed present on 2026-09-17: 25 such folders). Those
+# happen to be safe today only because their mtimes stay fresh; a folder that
+# goes 2+ days without being touched (a deprecated fallback path, a service
+# that stops getting used) would otherwise be silently swept into the same
+# age/backup check as a real task folder and could be deleted outright, since
+# _has_backed_up_video()'s suffix match is a coincidence away from a false
+# positive too. Restricting to actual uuid4 names makes non-task folders
+# structurally ineligible instead of relying on that coincidence.
+TASK_ID_RE = re.compile(
+    r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.IGNORECASE
+)
 CACHE_VIDEOS_MAX_AGE_DAYS = 7
 
 
@@ -77,10 +93,15 @@ def main(argv: list | None = None):
     deleted = 0
     skipped_too_new = 0
     skipped_no_backup = 0
+    skipped_not_task = 0
 
     for entry in sorted(os.listdir(STORAGE_TASKS_DIR)):
         folder = os.path.join(STORAGE_TASKS_DIR, entry)
         if not os.path.isdir(folder):
+            continue
+
+        if not TASK_ID_RE.match(entry):
+            skipped_not_task += 1
             continue
 
         age_days = (now - os.path.getmtime(folder)) / 86400
@@ -109,8 +130,9 @@ def main(argv: list | None = None):
     verb = "Would free" if args.dry_run else "Freed"
     print(
         f"\n{verb} {freed_bytes / 1024 / 1024:.1f}MB from {deleted} task folder(s). "
-        f"Skipped {skipped_too_new} (too new, <{MIN_AGE_DAYS}d) and "
-        f"{skipped_no_backup} (no confirmed Videos/ backup yet)."
+        f"Skipped {skipped_too_new} (too new, <{MIN_AGE_DAYS}d), "
+        f"{skipped_no_backup} (no confirmed Videos/ backup yet), and "
+        f"{skipped_not_task} (not a task-uuid folder, left untouched)."
     )
 
     if args.dry_run:
