@@ -58,6 +58,33 @@ CATEGORY_KEYWORDS = {
     "perception_illusion": ["illusion", "lying", "lie", "perceive", "perception"],
 }
 
+# Kokoro (local, free TTS -- see resources/kokoro/) voice per category, so the
+# narrator's tone matches the content instead of one voice for everything:
+# am_adam = punchy/urgent male ("viral" hook delivery), for content that
+# hooks on danger or manipulation; bm_george = calm authoritative British
+# male (documentary/Nat-Geo narrator feel), for explainer/fact content;
+# af_heart = warm female, for relationship/social and anything unclassified.
+CATEGORY_VOICE = {
+    "fear_safety": "am_adam",
+    "bias_decisionmaking": "am_adam",
+    "memory": "bm_george",
+    "perception_illusion": "bm_george",
+    "emotion_music": "bm_george",
+    "social_relationships": "af_heart",
+    "general": "af_heart",
+}
+
+
+def voice_for_topic(topic: str) -> str:
+    """Pick a Kokoro voice id for a topic string, before the video (and its
+    title) exist -- classify_video() needs a title too, so this repeats its
+    keyword scan on the topic alone, good enough for voice selection."""
+    text = topic.lower()
+    for cat, keywords in CATEGORY_KEYWORDS.items():
+        if any(kw in text for kw in keywords):
+            return CATEGORY_VOICE.get(cat, "af_heart")
+    return CATEGORY_VOICE["general"]
+
 
 def build_seo_tags(
     subject: str, title: str, category: str, hashtags: list, is_short: bool = True
@@ -237,6 +264,7 @@ def run_batch(topics: list) -> list:
                 "subtitle_animation": (
                     "pop_spring" if subtitle_display_mode == "word_by_word" else "none"
                 ),
+                "voice_name": f"kokoro:{voice_for_topic(topic)}",
             }
             script_prompt_parts = [FOLLOW_CTA_INSTRUCTION, SCRIPT_STYLE_SUFFIX.strip()]
 
