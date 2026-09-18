@@ -86,6 +86,41 @@ def voice_for_topic(topic: str) -> str:
     return CATEGORY_VOICE["general"]
 
 
+# resource/songs/*.mp3 tracks grouped by tempo/energy (librosa beat_track +
+# RMS, see automation/classify_bgm.py -- one-off analysis, not run per video)
+# so bgm mood matches the narrator instead of a random pick across all 29
+# tracks. Random bgm_type picked e.g. a 185bpm energetic track under the
+# calm bm_george narration -- found 2026-09-18, first Kokoro test render.
+BGM_BY_VOICE = {
+    # am_adam: punchy/urgent hook delivery -> high-tempo (172-185bpm) tracks.
+    "am_adam": [
+        "output001.mp3", "output004.mp3", "output014.mp3",
+        "output016.mp3", "output023.mp3", "output029.mp3",
+    ],
+    # bm_george: calm documentary narrator -> lowest tempo (<=90bpm) and/or
+    # low-energy tracks.
+    "bm_george": [
+        "output010.mp3", "output025.mp3", "output028.mp3", "output022.mp3",
+        "output011.mp3", "output007.mp3", "output018.mp3", "output003.mp3",
+    ],
+    # af_heart: warm/general -> everything mid-tempo (89-103bpm), the
+    # largest pool since it also covers the "general" catch-all category.
+    "af_heart": [
+        "output000.mp3", "output002.mp3", "output005.mp3", "output006.mp3",
+        "output008.mp3", "output009.mp3", "output012.mp3", "output013.mp3",
+        "output015.mp3", "output017.mp3", "output019.mp3", "output020.mp3",
+        "output021.mp3", "output024.mp3", "output027.mp3",
+    ],
+}
+
+
+def bgm_for_voice(voice: str) -> str:
+    import random
+
+    pool = BGM_BY_VOICE.get(voice, BGM_BY_VOICE["af_heart"])
+    return random.choice(pool)
+
+
 def build_seo_tags(
     subject: str, title: str, category: str, hashtags: list, is_short: bool = True
 ) -> list:
@@ -257,6 +292,7 @@ def run_batch(topics: list) -> list:
             # subtitle_display_mode logged on log_entry below.
             subtitle_display_mode = random.choice(["sentence", "word_by_word"])
             subtitle_modes.append(subtitle_display_mode)
+            chosen_voice = voice_for_topic(topic)
             entry = {
                 "video_subject": topic,
                 "video_language": "en-US",
@@ -264,7 +300,9 @@ def run_batch(topics: list) -> list:
                 "subtitle_animation": (
                     "pop_spring" if subtitle_display_mode == "word_by_word" else "none"
                 ),
-                "voice_name": f"kokoro:{voice_for_topic(topic)}",
+                "voice_name": f"kokoro:{chosen_voice}",
+                "bgm_type": "custom",
+                "bgm_file": bgm_for_voice(chosen_voice),
             }
             script_prompt_parts = [FOLLOW_CTA_INSTRUCTION, SCRIPT_STYLE_SUFFIX.strip()]
 
