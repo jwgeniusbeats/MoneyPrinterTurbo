@@ -244,6 +244,43 @@ def extract_and_set_thumbnail(youtube_video_id: str, video_path: str):
             os.remove(thumb_path)
 
 
+def create_meta_variant(video_path: str) -> str:
+    """Re-encode a distinct copy of video_path for Instagram/Facebook uploads.
+
+    Instagram's "Originality Score" (confirmed by Adam Mosseri, in effect
+    2026) flags a Reel whose underlying video file matches one already on
+    the platform elsewhere -- even with no visible watermark -- and cuts
+    reach 40-80%, no longer recommending it via Explore. This pipeline
+    uploads the SAME rendered .mp4 to TikTok, YouTube, Facebook and
+    Instagram, so the Instagram/Facebook copy was very likely getting
+    fingerprint-matched against the TikTok upload. A tiny imperceptible
+    zoom (crop + scale back to the original frame size) changes every
+    pixel and the file bytes, breaking that match, without a visible
+    difference to viewers. Re-encoded once here and reused for both the
+    Facebook and Instagram uploads (not re-derived per platform) so they
+    don't also fingerprint-match EACH OTHER.
+
+    Falls back to the original video_path on any ffmpeg failure -- a
+    slightly-lower-reach upload beats a failed one.
+    """
+    base, ext = os.path.splitext(video_path)
+    variant_path = f"{base}-meta{ext}"
+    result = subprocess.run(
+        [
+            "ffmpeg", "-y", "-i", video_path,
+            "-vf", "crop=trunc(iw*0.97/2)*2:trunc(ih*0.97/2)*2,scale=1080:1920",
+            "-c:v", "libx264", "-preset", "medium", "-crf", "20",
+            "-c:a", "aac", "-b:a", "128k",
+            variant_path,
+        ],
+        capture_output=True, text=True, timeout=120,
+    )
+    if result.returncode != 0 or not os.path.exists(variant_path):
+        print(f"create_meta_variant failed, falling back to original: {result.stderr[-300:]}")
+        return video_path
+    return variant_path
+
+
 def next_slot_utc(state: dict) -> datetime:
     """Advance to the next configured CET slot after the last scheduled one.
 
@@ -543,10 +580,15 @@ def retry_failed_platforms(post_log: list):
                 print(f"Retry still failing: YouTube for {title!r}: {e}")
 
         fb = platforms.get("facebook", {})
+        ig = platforms.get("instagram", {})
+        meta_variant_path = video_path
+        if fb.get("status") in RETRYABLE_STATUSES or ig.get("status") in RETRYABLE_STATUSES:
+            meta_variant_path = create_meta_variant(video_path)
+
         if fb.get("status") in RETRYABLE_STATUSES:
             try:
                 fb_result = meta_api.upload_facebook_video(
-                    video_path=video_path, title=title, description=description,
+                    video_path=meta_variant_path, title=title, description=description,
                 )
                 new_fb = {"id": fb_result.get("id"), "status": "live"}
                 platforms["facebook"] = new_fb
@@ -556,10 +598,9 @@ def retry_failed_platforms(post_log: list):
             except Exception as e:
                 print(f"Retry still failing: Facebook for {title!r}: {e}")
 
-        ig = platforms.get("instagram", {})
         if ig.get("status") in RETRYABLE_STATUSES:
             try:
-                ig_result = instagram_api.upload_reel_via_url(video_path=video_path, caption=description)
+                ig_result = instagram_api.upload_reel_via_url(video_path=meta_variant_path, caption=description)
                 new_ig = {"id": ig_result.get("id"), "status": "live"}
                 platforms["instagram"] = new_ig
                 print(f"Retry OK: Instagram for {title!r}")
@@ -567,6 +608,9 @@ def retry_failed_platforms(post_log: list):
                     retried_updates.setdefault(task_id, {})["instagram"] = new_ig
             except Exception as e:
                 print(f"Retry still failing: Instagram for {title!r}: {e}")
+
+        if meta_variant_path != video_path and os.path.exists(meta_variant_path):
+            os.remove(meta_variant_path)
 
     if retried_updates:
         # Merge into a freshly-read copy under lock instead of overwriting
@@ -697,9 +741,11 @@ def main():
             print(f"YouTube upload failed for {subject}: {e}")
             log_entry["platforms"]["youtube"] = {"status": "failed", "error": str(e)}
 
+        meta_variant_path = create_meta_variant(video_path)
+
         try:
             fb_result = meta_api.upload_facebook_video(
-                video_path=video_path,
+                video_path=meta_variant_path,
                 title=title,
                 description=description,
                 scheduled_publish_time=int(slot_dt.timestamp()),
@@ -721,12 +767,15 @@ def main():
             # Instagram's API has no native "schedule for later" (unlike
             # YouTube/Facebook), so it publishes immediately at generation
             # time rather than waiting for the 13:00/20:00 slot.
-            ig_result = instagram_api.upload_reel_via_url(video_path=video_path, caption=description)
+            ig_result = instagram_api.upload_reel_via_url(video_path=meta_variant_path, caption=description)
             print(f"Instagram published: {ig_result.get('id')}")
             log_entry["platforms"]["instagram"] = {"id": ig_result.get("id"), "status": "live"}
         except Exception as e:
             print(f"Instagram upload failed for {subject}: {e}")
             log_entry["platforms"]["instagram"] = {"status": "failed", "error": str(e)}
+
+        if meta_variant_path != video_path and os.path.exists(meta_variant_path):
+            os.remove(meta_variant_path)
 
         log_entry["platforms"]["tiktok"] = {"status": "pending_manual"}
         # Append under lock against a freshly-read copy, not the in-memory
