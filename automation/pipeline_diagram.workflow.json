@@ -1,0 +1,44 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "Nognize Daily Pipeline",
+    "output": "automation/pipeline_diagram.html",
+    "quality_profile": "showcase"
+  },
+  "lanes": [
+    { "id": "pipeline", "label": "Generation" },
+    { "id": "media", "label": "Media Prep" },
+    { "id": "metaprep", "label": "Meta Re-encode" },
+    { "id": "video_platforms", "label": "Video Platforms" },
+    { "id": "meta_platforms", "label": "Meta Platforms" }
+  ],
+  "mainPath": ["topic", "script", "tts", "render", "youtube"],
+  "nodes": [
+    { "id": "topic", "lane": "pipeline", "col": 0, "type": "external", "label": "Topic Backlog", "sublabel": "topic_backlog.json" },
+    { "id": "script", "lane": "pipeline", "col": 1, "type": "backend", "label": "Script Gen", "sublabel": "Gemini" },
+    { "id": "tts", "lane": "pipeline", "col": 2, "type": "backend", "label": "Voice", "sublabel": "Kokoro TTS" },
+    { "id": "broll", "lane": "media", "col": 2, "type": "external", "label": "B-roll", "sublabel": "Pexels" },
+    { "id": "subs", "lane": "pipeline", "col": 3, "type": "backend", "label": "Subtitles", "sublabel": "Whisper", "yOffset": 70 },
+    { "id": "render", "lane": "pipeline", "col": 4, "type": "backend", "label": "Render", "sublabel": "ffmpeg" },
+    { "id": "variant", "lane": "metaprep", "col": 4, "type": "backend", "label": "Meta Variant", "sublabel": "3% crop re-encode" },
+    { "id": "youtube", "lane": "video_platforms", "col": 5, "type": "external", "label": "YouTube", "sublabel": "native schedule" },
+    { "id": "tiktok", "lane": "video_platforms", "col": 5, "type": "external", "label": "TikTok", "sublabel": "queued, 4x/day", "yOffset": 70 },
+    { "id": "facebook", "lane": "meta_platforms", "col": 5, "type": "external", "label": "Facebook", "sublabel": "native schedule" },
+    { "id": "instagram", "lane": "meta_platforms", "col": 5, "type": "external", "label": "Instagram", "sublabel": "posts immediately", "yOffset": 70 }
+  ],
+  "edges": [
+    { "from": "topic", "to": "script", "variant": "emphasis" },
+    { "from": "script", "to": "tts", "variant": "emphasis" },
+    { "from": "script", "to": "broll", "label": "keyword search" },
+    { "from": "tts", "to": "subs", "label": "align" },
+    { "from": "tts", "to": "render", "variant": "emphasis" },
+    { "from": "broll", "to": "render" },
+    { "from": "subs", "to": "render" },
+    { "from": "render", "to": "youtube", "variant": "emphasis" },
+    { "from": "render", "to": "tiktok" },
+    { "from": "render", "to": "variant", "label": "same file dodges Originality Score" },
+    { "from": "variant", "to": "facebook" },
+    { "from": "variant", "to": "instagram" }
+  ]
+}
