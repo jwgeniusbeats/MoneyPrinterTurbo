@@ -89,9 +89,12 @@ def main(source_video, project_dir, output_path, clip_start, clip_end, hook_text
             raise RuntimeError(resp)
 
         print("6. cover-crop to vertical (scale up landscape source)")
+        # Base fit is width-fit (source shown at canvas_width / source_width),
+        # so filling canvas HEIGHT needs scale = (canvas_h / canvas_w) / (source_h / source_w)
+        # = (1920/1080) / (1080/1920) = 3.16 for a 1920x1080 source in a 1080x1920 canvas.
         resp = call(proc, "edit.apply", {
             "path": path,
-            "command": {"op": "setClipTransform", "clipId": clip_id, "scale": 1.78},
+            "command": {"op": "setClipTransform", "clipId": clip_id, "scale": 3.16},
         }, req_id=6)
         print("  ", json.dumps(resp)[:200])
 
@@ -101,10 +104,10 @@ def main(source_video, project_dir, output_path, clip_start, clip_end, hook_text
             "command": {
                 "op": "addTextClip", "above": True, "start": 0.0, "duration": 2.0,
                 "style": {
-                    "content": hook_text, "fontFamily": "Helvetica", "fontSize": 0.07,
+                    "content": hook_text, "fontFamily": "Helvetica", "fontSize": 0.045,
                     "fontWeight": 800, "color": "#ffffff", "align": "center",
-                    "opacity": 1.0, "strokeWidth": 0.012, "strokeColor": "#000000",
-                    "shadow": True, "background": "",
+                    "opacity": 1.0, "strokeWidth": 0.008, "strokeColor": "#000000",
+                    "shadow": True, "background": "", "maxWidth": 0.85,
                 },
             },
         }, req_id=7)
@@ -118,10 +121,10 @@ def main(source_video, project_dir, output_path, clip_start, clip_end, hook_text
                 "op": "addTextClip", "above": True, "start": caption_rel_start,
                 "duration": caption_rel_end - caption_rel_start, "offsetY": 0.32,
                 "style": {
-                    "content": caption_text, "fontFamily": "Helvetica", "fontSize": 0.055,
+                    "content": caption_text, "fontFamily": "Helvetica", "fontSize": 0.04,
                     "fontWeight": 700, "color": "#ffffff", "align": "center",
-                    "opacity": 1.0, "strokeWidth": 0.01, "strokeColor": "#000000",
-                    "shadow": True, "background": "",
+                    "opacity": 1.0, "strokeWidth": 0.007, "strokeColor": "#000000",
+                    "shadow": True, "background": "", "maxWidth": 0.85,
                 },
             },
         }, req_id=8)
