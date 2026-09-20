@@ -551,6 +551,18 @@ def retry_failed_platforms(post_log: list):
     # tiktok-daily-post / mark_tiktok_posted.py flipped to "live" while these
     # (slow, network-bound) retries were still running.
     retried_updates = {}
+    # Cap retries per platform per call to 1 (real incident, 2026-09-20: a
+    # GCS token fix let 4 backlogged Instagram posts all retry in the same
+    # run, going live back-to-back within 5 minutes -- Instagram has no
+    # native scheduling, so "retry" always means "post right now", and
+    # burst-posting several at once looks spammy and isn't reversible.
+    # One per call means one per daily_pipeline.py run (this function's
+    # only caller), naturally spacing a backlog out at one per day instead
+    # of dumping it all at once. Applies to YouTube/Facebook too even
+    # though those two are less exposed (a retry there also posts
+    # immediately rather than at a computed future slot).
+    retries_done = {"youtube": 0, "facebook": 0, "instagram": 0}
+    MAX_RETRIES_PER_PLATFORM_PER_RUN = 1
     for entry in post_log:
         video_path = entry.get("video_path")
         if not video_path or not os.path.exists(video_path):
@@ -561,7 +573,8 @@ def retry_failed_platforms(post_log: list):
         task_id = entry.get("task_id")
 
         yt = platforms.get("youtube", {})
-        if yt.get("status") in RETRYABLE_STATUSES:
+        if yt.get("status") in RETRYABLE_STATUSES and retries_done["youtube"] < MAX_RETRIES_PER_PLATFORM_PER_RUN:
+            retries_done["youtube"] += 1
             try:
                 yt_result = youtube_api.upload_video(
                     video_path=video_path, title=title, description=description,
@@ -581,11 +594,14 @@ def retry_failed_platforms(post_log: list):
 
         fb = platforms.get("facebook", {})
         ig = platforms.get("instagram", {})
+        fb_eligible = fb.get("status") in RETRYABLE_STATUSES and retries_done["facebook"] < MAX_RETRIES_PER_PLATFORM_PER_RUN
+        ig_eligible = ig.get("status") in RETRYABLE_STATUSES and retries_done["instagram"] < MAX_RETRIES_PER_PLATFORM_PER_RUN
         meta_variant_path = video_path
-        if fb.get("status") in RETRYABLE_STATUSES or ig.get("status") in RETRYABLE_STATUSES:
+        if fb_eligible or ig_eligible:
             meta_variant_path = create_meta_variant(video_path)
 
-        if fb.get("status") in RETRYABLE_STATUSES:
+        if fb_eligible:
+            retries_done["facebook"] += 1
             try:
                 fb_result = meta_api.upload_facebook_video(
                     video_path=meta_variant_path, title=title, description=description,
@@ -598,7 +614,8 @@ def retry_failed_platforms(post_log: list):
             except Exception as e:
                 print(f"Retry still failing: Facebook for {title!r}: {e}")
 
-        if ig.get("status") in RETRYABLE_STATUSES:
+        if ig_eligible:
+            retries_done["instagram"] += 1
             try:
                 ig_result = instagram_api.upload_reel_via_url(video_path=meta_variant_path, caption=description)
                 new_ig = {"id": ig_result.get("id"), "status": "live"}
