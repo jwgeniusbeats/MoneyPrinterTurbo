@@ -565,7 +565,7 @@ def retry_failed_platforms(post_log: list):
             try:
                 yt_result = youtube_api.upload_video(
                     video_path=video_path, title=title, description=description,
-                    privacy_status="public",
+                    tags=entry.get("seo_tags"), privacy_status="public",
                 )
                 new_yt = {"id": yt_result.get("id"), "status": "live"}
                 platforms["youtube"] = new_yt
@@ -707,6 +707,11 @@ def main():
         labeled_path = labeled_paths[0] if labeled_paths else video_path
         log_entry["video_path"] = labeled_path
         log_entry["description"] = description
+        # Persisted so retry_failed_platforms() can pass the same tags on a
+        # retried YouTube upload -- without this, a video that fails its
+        # first upload attempt and succeeds on retry publishes with zero
+        # SEO tags, since seo_tags only ever lived in this local variable.
+        log_entry["seo_tags"] = seo_tags
 
         # Compute the candidate slot but DON'T commit it to state yet -- only
         # persist it once the upload that actually uses it (YouTube) succeeds.
