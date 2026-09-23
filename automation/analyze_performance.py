@@ -164,22 +164,28 @@ def write_learnings(entries: list):
         for e in bottom:
             lines.append(_fmt(e))
 
+    # _score() picks whichever of "% watched" or "view count" is available
+    # per video, so two entries in the same bucket can be on different
+    # scales (e.g. 186 meaning 186% watched vs. 186 meaning 186 views).
+    # Averaging _score() across a category/hook-type would silently mix
+    # those units into one meaningless number. Total views is the only
+    # metric every entry has on the same scale, so aggregates use that.
     tagged = [e for e in scored if e.get("category")]
     if tagged:
         by_cat = {}
         for e in tagged:
-            by_cat.setdefault(e["category"], []).append(_score(e))
+            by_cat.setdefault(e["category"], []).append(_total_views(e))
         by_hook = {}
         for e in tagged:
             if e.get("hook_type"):
-                by_hook.setdefault(e["hook_type"], []).append(_score(e))
+                by_hook.setdefault(e["hook_type"], []).append(_total_views(e))
         lines.append("")
-        lines.append("## Average score by category")
+        lines.append("## Average total views by category")
         for cat, vals in sorted(by_cat.items(), key=lambda kv: -sum(kv[1]) / len(kv[1])):
             lines.append(f"- {cat}: avg {sum(vals)/len(vals):.1f} ({len(vals)} videos)")
         if by_hook:
             lines.append("")
-            lines.append("## Average score by hook type")
+            lines.append("## Average total views by hook type")
             for hook, vals in sorted(by_hook.items(), key=lambda kv: -sum(kv[1]) / len(kv[1])):
                 lines.append(f"- {hook}: avg {sum(vals)/len(vals):.1f} ({len(vals)} videos)")
 
