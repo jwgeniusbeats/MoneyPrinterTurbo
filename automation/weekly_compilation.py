@@ -27,13 +27,16 @@ sys.path.insert(0, BASE_DIR)
 from app.services import llm, youtube_api  # noqa: E402
 from automation.daily_pipeline import (  # noqa: E402
     LINK_IN_BIO_CTA,
+    MANUAL_REMINDER_FILE,
     _atomic_write_json,
     build_seo_tags,
     extract_and_set_thumbnail,
 )
+from automation.post_log_lock import locked_post_log  # noqa: E402
 
 POST_LOG_FILE = os.path.join(BASE_DIR, "automation", "post_log.json")
 COMPILATION_LOG_FILE = os.path.join(BASE_DIR, "automation", "compilation_log.json")
+COMPILATIONS_DIR = os.path.join(BASE_DIR, "Videos", "compilations")
 MIN_CLIPS = 3
 MAX_CLIPS = 8
 
@@ -143,9 +146,17 @@ def main():
     video_paths = [c["video_path"] for c in clips]
     titles = [c.get("title") or c["subject"] for c in clips]
 
-    output_path = os.path.join(tempfile.gettempdir(), f"compilation_{datetime.now():%Y%m%d}.mp4")
+    tmp_output_path = os.path.join(tempfile.gettempdir(), f"compilation_{datetime.now():%Y%m%d}.mp4")
     print(f"Concatenating {len(clips)} clips...")
-    concat_videos(video_paths, output_path)
+    concat_videos(video_paths, tmp_output_path)
+
+    # Moved out of tempfile into a permanent Videos/ location (not deleted
+    # at the end, unlike the old tmp_output_path) -- tiktok-daily-post needs
+    # the file to still exist whenever it eventually processes the queue
+    # entry appended below, which can be hours or days after this run.
+    os.makedirs(COMPILATIONS_DIR, exist_ok=True)
+    output_path = os.path.join(COMPILATIONS_DIR, os.path.basename(tmp_output_path))
+    os.replace(tmp_output_path, output_path)
 
     meta = generate_compilation_metadata(titles)
     description = meta["description"] + LINK_IN_BIO_CTA
@@ -183,8 +194,48 @@ def main():
     })
     save_compilation_log(compilation_log)
 
-    if os.path.exists(output_path):
-        os.remove(output_path)
+    # Queue for TikTok too, via the same manual_post_queue.txt /
+    # tiktok-daily-post flow the daily shorts already use -- TikTok's
+    # Creator Rewards Program needs videos over 1 minute, which none of the
+    # daily shorts (25-48s, tuned for short-form completion rate) qualify
+    # for, but this 5-7 minute compilation already does, at no extra
+    # content-creation cost.
+    #
+    # This compilation also needs its own post_log.json entry, the same way
+    # every daily short gets one before being queued (see daily_pipeline.py's
+    # run_batch): mark_tiktok_posted.py and update_tiktok_stats.py both only
+    # know about videos that have a post_log entry with a tiktok field.
+    # Without one, tiktok-daily-post posts this file, mark_tiktok_posted.py
+    # can't find any matching video_path so the entry never flips to "live",
+    # yet the video *is* now on TikTok Studio's real content list --
+    # permanently shifting update_tiktok_stats.py's newest-first order
+    # pairing by one for every video posted after it, silently misattributing
+    # stats (the exact class of bug fixed for regular posts on 2026-09-15,
+    # reopened here because this path skipped that fix).
+    compilation_task_id = f"compilation_{video_id}"
+    with locked_post_log() as post_log_entries:
+        post_log_entries.append({
+            "task_id": compilation_task_id,
+            "subject": meta["title"],
+            "title": meta["title"],
+            "posted_at": datetime.now(timezone.utc).isoformat(),
+            "category": top_category,
+            "video_path": output_path,
+            "description": description,
+            "seo_tags": seo_tags,
+            "platforms": {
+                "youtube": {"id": video_id, "status": "live"},
+                "tiktok": {"status": "pending_manual"},
+            },
+        })
+
+    with open(MANUAL_REMINDER_FILE, "a") as f:
+        f.write(f"\n--- Weekly compilation {datetime.now(timezone.utc).isoformat()} ---\n")
+        f.write(
+            f"=== {meta['title']} ===\nFile: {output_path}\nCaption:\n{description}\n"
+            f"Suggested time: {datetime.now(timezone.utc).isoformat()} (UTC) -> post manually on TikTok\n\n"
+        )
+    print(f"Queued for TikTok: {output_path}")
 
     print(f"Done: {len(clips)} clips bundled into {video_id}.")
 
