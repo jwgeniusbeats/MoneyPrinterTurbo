@@ -1794,6 +1794,21 @@ class TestClaudeCodeProvider(unittest.TestCase):
             run.call_args.kwargs["timeout"], llm.CLAUDE_CODE_DEFAULT_TIMEOUT
         )
 
+    def test_cli_output_decoded_as_utf8(self):
+        """CLI 输出固定按 UTF-8 解码，避免非英文 Windows 上用系统区域码乱码。"""
+        with (
+            patch.object(llm.shutil, "which", return_value="/usr/bin/claude"),
+            patch.object(
+                llm.subprocess,
+                "run",
+                return_value=self._completed(stdout=self._cli_payload("ok")),
+            ) as run,
+        ):
+            llm._generate_response("write something")
+
+        self.assertEqual(run.call_args.kwargs["encoding"], "utf-8")
+        self.assertEqual(run.call_args.kwargs["errors"], "replace")
+
     def test_generation_disables_tools_and_user_customizations(self):
         """纯文本生成必须关闭全部工具和用户级定制，避免读写文件或加载 skills。"""
         with (

@@ -39,6 +39,12 @@ COMPILATION_LOG_FILE = os.path.join(BASE_DIR, "automation", "compilation_log.jso
 COMPILATIONS_DIR = os.path.join(BASE_DIR, "Videos", "compilations")
 MIN_CLIPS = 3
 MAX_CLIPS = 8
+# "Full Deep Dives" playlist, created 2026-09-24 -- compilations otherwise
+# sit undiscovered (confirmed: both existing ones had 2-5 views days after
+# posting despite same-channel Shorts getting hundreds), since YouTube
+# treats Shorts and long-form as separate discovery feeds with no organic
+# crossover for a channel this small.
+COMPILATIONS_PLAYLIST_ID = "PLOp_76iMfnsI"
 
 
 def load_post_log() -> list:
@@ -184,6 +190,12 @@ def main():
         extract_and_set_thumbnail(video_id, video_paths[0])
     except Exception as e:
         print(f"Thumbnail set failed (non-fatal): {e}")
+
+    try:
+        youtube_api.add_video_to_playlist(COMPILATIONS_PLAYLIST_ID, video_id)
+        print(f"Added to Full Deep Dives playlist: {video_id}")
+    except Exception as e:
+        print(f"Add to playlist failed (non-fatal): {e}")
 
     compilation_log.append({
         "video_id": video_id,

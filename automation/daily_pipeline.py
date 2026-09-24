@@ -42,9 +42,38 @@ MAX_VIDEO_SCRIPT_PROMPT_LENGTH = 2000
 # drive traffic there, not just the bio itself, since that's the one owned
 # asset that doesn't depend on any single platform's algorithm or payout
 # threshold.
-LINK_IN_BIO_URL = "tinyurl.com/238zsuaa"
+LINK_IN_BIO_URL = "tinyurl.com/ycxk9x6u"
+# The old tinyurl.com/238zsuaa link was created via TinyURL's now-deprecated
+# API endpoint -- confirmed 2026-09-24 it now shows a cookie-consent wall
+# plus a 10-second "Preview" countdown before redirecting, instead of an
+# instant redirect. Every video's CTA had been sending traffic through that
+# friction the whole time. Replaced with a fresh link (created via TinyURL's
+# current form) pointing at the same destination -- verified instant 301,
+# no interstitial.
 LINK_IN_BIO_CTA = f"\n\n\U0001f517 More facts + early access: {LINK_IN_BIO_URL}"
 CET_ZONE = ZoneInfo("Europe/Amsterdam")  # DST-aware CET/CEST, no manual offset to maintain
+COMPILATION_LOG_FILE = os.path.join(BASE_DIR, "automation", "compilation_log.json")
+
+
+def youtube_compilation_cta() -> str:
+    """CTA pointing a Short at the latest long-form compilation, YouTube-only
+    (not mixed into the shared `description` used for FB/IG too) -- Shorts
+    get real views but almost no watch-hours, compilations get watch-hours
+    but ~zero organic discovery since YouTube treats Shorts and long-form as
+    separate feeds. This is the only traffic path between the two until the
+    channel is big enough for either to surface the other on its own
+    (confirmed 2026-09-24: both existing compilations sat at 2-5 views days
+    after posting, despite same-channel Shorts getting hundreds). Points at
+    the "Full Deep Dives" playlist (PLOp_76iMfnsI, created 2026-09-24)
+    rather than a single latest-video link -- a playlist link never goes
+    stale week to week and shows the whole backlog, not just one video."""
+    if not os.path.exists(COMPILATION_LOG_FILE):
+        return ""
+    with open(COMPILATION_LOG_FILE) as f:
+        entries = json.load(f)
+    if not entries:
+        return ""
+    return "\n\n\U0001f3ac Full deep dives: youtube.com/playlist?list=PLOp_76iMfnsI"
 
 
 CATEGORY_KEYWORDS = {
@@ -577,7 +606,7 @@ def retry_failed_platforms(post_log: list):
             retries_done["youtube"] += 1
             try:
                 yt_result = youtube_api.upload_video(
-                    video_path=video_path, title=title, description=description,
+                    video_path=video_path, title=title, description=description + youtube_compilation_cta(),
                     tags=entry.get("seo_tags"), privacy_status="public",
                 )
                 new_yt = {"id": yt_result.get("id"), "status": "live"}
@@ -743,7 +772,7 @@ def main():
             yt_result = youtube_api.upload_video(
                 video_path=video_path,
                 title=title,
-                description=description,
+                description=description + youtube_compilation_cta(),
                 tags=seo_tags,
                 publish_at=candidate_scheduled_utc,
             )

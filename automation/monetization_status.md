@@ -1,19 +1,26 @@
 # Monetization status
 
-_Last updated: 2026-09-14T23:48:26.238196+00:00_
+_Last updated: 2026-09-24T12:36:23.271506+00:00_
 
 ## YouTube
-- Subscribers: 0 / 1000 — [--------------------] 0.0%
-- Total lifetime views: 0 (8 videos)
-- Watch hours (365d): 0.0 / 4000 — [--------------------] 0.0%
-- Views (90d, Shorts-path proxy): 8 / 10,000,000 — [--------------------] 0.0%
+- Subscribers: 18 / 1000 — [--------------------] 1.8%
+- Total lifetime views: 3,045 (46 videos)
+- Videos posted (90d): 46 / 3
+- Watch hours (365d): 4.6 / 4000 — [--------------------] 0.1%
+- Views (90d, Shorts-path proxy): 2,515 / 10,000,000 — [--------------------] 0.0%
 
 **Entry-tier (Partner Program) eligible: not yet**
 **Full monetization eligible: not yet**
 
 
 ## TikTok
-- No follower data yet — `scrape-tiktok-stats` writes tiktok_followers.json on its next weekly run.
+- Followers: 0 / 10,000 — [--------------------] 0.0%
+- Views (30d, videos posted in that window): 5,433 / 100,000 — [#-------------------] 5.4%
+- Follower count last scraped: 2026-09-23T12:44:08.020Z
+- **Account type: keep Personal.** Business accounts are explicitly excluded from Creator Rewards Program -- do NOT switch to Business/Verified Business.
+- **Country blocker (hard, not fixable by growth): Creator Rewards Program is only available to accounts registered in the US, UK, Germany, Japan, South Korea, France, Mexico, or Brazil. This account's region is Netherlands, which is not on that list -- meeting the follower/view thresholds below will not make it eligible.
+
+**Creator Rewards Program eligible: not yet**
 
 
 ## Instagram / Facebook (no comparable program to track)

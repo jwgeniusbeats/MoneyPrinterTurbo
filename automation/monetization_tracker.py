@@ -170,18 +170,33 @@ def check_tiktok() -> str:
             if posted_ts >= cutoff:
                 views_30d += tt["views"]
 
-    ready = followers >= TIKTOK_FOLLOWERS_TARGET and views_30d >= TIKTOK_VIEWS_30D_TARGET
+    thresholds_met = followers >= TIKTOK_FOLLOWERS_TARGET and views_30d >= TIKTOK_VIEWS_30D_TARGET
+    # Verified 2026-09-24 against TikTok's own Creator Academy article
+    # (tiktok.com/creator-academy/article/creator-rewards-program) after a
+    # prior wrong assumption here (switch to Creator/Business) nearly got
+    # the account run through TikTok's Verified Business registration --
+    # which would have PERMANENTLY DISQUALIFIED it. The real rule is the
+    # opposite: only Personal accounts are eligible; Business accounts are
+    # explicitly excluded. The program is also only available to accounts
+    # registered in US/UK/DE/JP/KR/FR/MX/BR -- this account's region is
+    # Netherlands, which is not on that list, so it cannot join regardless
+    # of followers/views/account-type. Re-check that country list on TikTok's
+    # own page before ever reporting this as reachable.
+    country_eligible = False  # account region: Netherlands, not on TikTok's list
+    ready = thresholds_met and country_eligible
     return (
         "\n## TikTok\n"
         f"- Followers: {followers} / {TIKTOK_FOLLOWERS_TARGET:,} — {_bar(followers, TIKTOK_FOLLOWERS_TARGET)}\n"
         f"- Views (30d, videos posted in that window): {views_30d:,} / {TIKTOK_VIEWS_30D_TARGET:,} — "
         f"{_bar(views_30d, TIKTOK_VIEWS_30D_TARGET)}\n"
         f"- Follower count last scraped: {updated_at}\n"
-        "- **Prerequisite, check on the TikTok mobile app**: the account must be switched "
-        "to a Creator (or Business) account to even be eligible for Creator Rewards -- "
-        "this toggle isn't exposed on TikTok's desktop web settings, only in the mobile "
-        "app under Settings > Account > Switch to Business/Creator Account.\n\n"
-        f"**Creator Rewards Program eligible: {'YES — apply now' if ready else 'not yet'}**"
+        "- **Account type: keep Personal.** Business accounts are explicitly excluded from "
+        "Creator Rewards Program -- do NOT switch to Business/Verified Business.\n"
+        "- **Country blocker (hard, not fixable by growth): Creator Rewards Program is only "
+        "available to accounts registered in the US, UK, Germany, Japan, South Korea, France, "
+        "Mexico, or Brazil. This account's region is Netherlands, which is not on that list -- "
+        "meeting the follower/view thresholds below will not make it eligible.\n\n"
+        f"**Creator Rewards Program eligible: {'not eligible (country)' if thresholds_met and not country_eligible else ('YES — apply now' if ready else 'not yet')}**"
     )
 
 

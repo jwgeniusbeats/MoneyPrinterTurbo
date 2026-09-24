@@ -51,3 +51,18 @@ secrets/
 Videos/
 automation/post_log.json.lock
 resources/
+
+# Clip service: client uploads/downloads and large generated media, not
+# source. orders/ can hold a buyer's actual video, keeping it out of git
+# matters for their privacy, not just repo size.
+orders/
+automation/portfolio_sources/
+automation/portfolio_output/
+automation/portfolio_projects/
+
+# Claude Code's own local tool config/worktrees -- not project source.
+.claude/
+
+# graphify's generated knowledge-graph output -- regenerated weekly by the
+# graphify-weekly-update task, not worth committing every week.
+graphify-out/

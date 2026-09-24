@@ -229,6 +229,39 @@ def set_thumbnail(video_id: str, image_path: str):
     return youtube.thumbnails().set(videoId=video_id, media_body=media).execute()
 
 
+def create_playlist(title: str, description: str = "", privacy_status: str = "public") -> str:
+    """Creates a playlist and returns its id."""
+    youtube = get_authenticated_service()
+    body = {
+        "snippet": {"title": title[:150], "description": description[:5000]},
+        "status": {"privacyStatus": privacy_status},
+    }
+    resp = youtube.playlists().insert(part="snippet,status", body=body).execute()
+    return resp["id"]
+
+
+def add_video_to_playlist(playlist_id: str, video_id: str):
+    """Appends a video to the end of a playlist. Silently no-ops if the
+    video is already in the playlist (playlistItems.insert would just add
+    a duplicate entry otherwise, since YouTube allows the same video twice)
+    -- check first to keep re-runs idempotent."""
+    youtube = get_authenticated_service()
+    existing = youtube.playlistItems().list(
+        part="snippet", playlistId=playlist_id, maxResults=50
+    ).execute()
+    for item in existing.get("items", []):
+        if item["snippet"]["resourceId"]["videoId"] == video_id:
+            return item["id"]
+    body = {
+        "snippet": {
+            "playlistId": playlist_id,
+            "resourceId": {"kind": "youtube#video", "videoId": video_id},
+        }
+    }
+    resp = youtube.playlistItems().insert(part="snippet", body=body).execute()
+    return resp["id"]
+
+
 def list_recent_top_level_comments(max_results: int = 50) -> list[dict]:
     """
     Top-level comments across ALL of this channel's videos, newest first --

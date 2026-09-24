@@ -23,10 +23,81 @@ entry.
 import os
 import sys
 
+import requests
+
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, BASE_DIR)
-from app.services import youtube_api  # noqa: E402
+from app.services import meta_api, youtube_api  # noqa: E402
 from automation.post_log_lock import locked_post_log  # noqa: E402
+
+
+def sync_youtube(post_log):
+    yt_ids = [e["platforms"]["youtube"]["id"] for e in post_log if e.get("platforms", {}).get("youtube", {}).get("id")]
+    if not yt_ids:
+        print("YouTube: no entries with an id found.")
+        return 0
+
+    yt = youtube_api.get_authenticated_service()
+    real_status = {}
+    for i in range(0, len(yt_ids), 50):
+        batch = yt_ids[i:i + 50]
+        resp = yt.videos().list(part="status", id=",".join(batch)).execute()
+        found_ids = {item["id"] for item in resp.get("items", [])}
+        for item in resp.get("items", []):
+            st = item["status"]
+            real_status[item["id"]] = "live" if st.get("privacyStatus") == "public" else st.get("privacyStatus")
+        for missing_id in set(batch) - found_ids:
+            real_status[missing_id] = "missing"  # deleted or otherwise gone
+
+    changed = 0
+    for e in post_log:
+        yt_entry = e.get("platforms", {}).get("youtube")
+        if not yt_entry or "id" not in yt_entry:
+            continue
+        real = real_status.get(yt_entry["id"])
+        if real and real != yt_entry.get("status"):
+            print(f"YouTube {e.get('title', '')[:50]!r}: {yt_entry.get('status')} -> {real}")
+            yt_entry["status"] = real
+            changed += 1
+    return changed
+
+
+def sync_facebook(post_log):
+    # video.status.publishing_phase.publish_status is the real signal --
+    # "ready"/video_status only means "finished encoding", it says nothing
+    # about whether the scheduled publish time has actually passed. Confirmed
+    # 2026-09-23: 4 of 5 sampled "scheduled" entries were already live on
+    # Facebook for days, because nothing ever flips this field after upload.
+    fb_ids = [e["platforms"]["facebook"]["id"] for e in post_log if e.get("platforms", {}).get("facebook", {}).get("id")]
+    if not fb_ids:
+        print("Facebook: no entries with an id found.")
+        return 0
+
+    page_id, token = meta_api._load_page_token()
+    real_status = {}
+    for vid in fb_ids:
+        resp = requests.get(
+            f"https://graph.facebook.com/v21.0/{vid}",
+            params={"access_token": token, "fields": "status"},
+            timeout=30,
+        ).json()
+        if "error" in resp:
+            real_status[vid] = "missing"  # deleted or inaccessible
+            continue
+        publish_status = resp.get("status", {}).get("publishing_phase", {}).get("publish_status")
+        real_status[vid] = "live" if publish_status == "published" else "scheduled" if publish_status == "scheduled" else publish_status
+
+    changed = 0
+    for e in post_log:
+        fb_entry = e.get("platforms", {}).get("facebook")
+        if not fb_entry or "id" not in fb_entry:
+            continue
+        real = real_status.get(fb_entry["id"])
+        if real and real != fb_entry.get("status"):
+            print(f"Facebook {e.get('title', '')[:50]!r}: {fb_entry.get('status')} -> {real}")
+            fb_entry["status"] = real
+            changed += 1
+    return changed
 
 
 def main():
@@ -36,38 +107,18 @@ def main():
     # change silently clobbered by this script's own overwrite (the same
     # class of bug post_log_lock.py exists to prevent -- see its docstring).
     with locked_post_log() as post_log:
-        yt_ids = [e["platforms"]["youtube"]["id"] for e in post_log if e.get("platforms", {}).get("youtube", {}).get("id")]
-        if not yt_ids:
-            print("No YouTube entries with an id found.")
-            return
+        try:
+            yt_changed = sync_youtube(post_log)
+        except Exception as exc:
+            print(f"YouTube: skipped, token error ({exc}) -- needs manual reauth, not attempting a fix here.")
+            yt_changed = 0
+        fb_changed = sync_facebook(post_log)
 
-        yt = youtube_api.get_authenticated_service()
-        real_status = {}
-        for i in range(0, len(yt_ids), 50):
-            batch = yt_ids[i:i + 50]
-            resp = yt.videos().list(part="status", id=",".join(batch)).execute()
-            found_ids = {item["id"] for item in resp.get("items", [])}
-            for item in resp.get("items", []):
-                st = item["status"]
-                real_status[item["id"]] = "live" if st.get("privacyStatus") == "public" else st.get("privacyStatus")
-            for missing_id in set(batch) - found_ids:
-                real_status[missing_id] = "missing"  # deleted or otherwise gone
-
-        changed = 0
-        for e in post_log:
-            yt_entry = e.get("platforms", {}).get("youtube")
-            if not yt_entry or "id" not in yt_entry:
-                continue
-            real = real_status.get(yt_entry["id"])
-            if real and real != yt_entry.get("status"):
-                print(f"{e.get('title', '')[:50]!r}: {yt_entry.get('status')} -> {real}")
-                yt_entry["status"] = real
-                changed += 1
-
-    if changed:
-        print(f"\nUpdated {changed} YouTube status field(s) in post_log.json.")
+    total = yt_changed + fb_changed
+    if total:
+        print(f"\nUpdated {yt_changed} YouTube + {fb_changed} Facebook status field(s) in post_log.json.")
     else:
-        print("Nothing to update -- all YouTube statuses already matched reality.")
+        print("Nothing to update -- all statuses already matched reality.")
 
 
 if __name__ == "__main__":
