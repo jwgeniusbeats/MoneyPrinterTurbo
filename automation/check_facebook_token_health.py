@@ -21,6 +21,8 @@ from datetime import datetime, timezone
 
 import requests
 
+from notify import notify_macos
+
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 APP_FILE = os.path.join(BASE_DIR, "secrets", "meta_app.json")
 TOKEN_FILE = os.path.join(BASE_DIR, "secrets", "meta_token.json")
@@ -48,6 +50,10 @@ def main():
 
     if not data.get("is_valid"):
         print(f"FAIL: Facebook Page token for '{PAGE_NAME}' is not valid: {data.get('error')}")
+        notify_macos(
+            "Facebook token invalid",
+            f"Page token for '{PAGE_NAME}' failed validation: {data.get('error')}",
+        )
         return "fail", None
 
     expires_at = data.get("expires_at", 0)
@@ -69,6 +75,10 @@ def main():
 
     if days_left <= WARN_AFTER_DAYS:
         print(f"WARN: data access expires in {days_left:.1f} days -- Page admin needs to re-confirm data access via Meta's consent flow.")
+        notify_macos(
+            "Facebook data access expiring",
+            f"{days_left:.1f} days left -- re-confirm data access via Meta's consent flow before it lapses.",
+        )
         return "warn", days_left
     print("OK: data access well within its window.")
     return "ok", days_left

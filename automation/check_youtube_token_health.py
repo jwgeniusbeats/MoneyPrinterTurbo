@@ -18,6 +18,8 @@ import json
 import os
 from datetime import datetime, timezone
 
+from notify import notify_macos
+
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TOKEN_FILE = os.path.join(BASE_DIR, "secrets", "youtube_token.json")
 WARN_AFTER_DAYS = 5  # Testing-mode tokens die at 7 days; warn with 2 days of runway
@@ -37,6 +39,10 @@ def main():
 
     if age_days >= WARN_AFTER_DAYS:
         print(f"WARN: token is {age_days:.1f} days old -- Testing-mode refresh tokens expire at 7 days.")
+        notify_macos(
+            "YouTube token ageing out",
+            f"{age_days:.1f} days old -- reauth before it hits 7 days (automation/reauth_youtube.py).",
+        )
         return "warn", age_days
     print("OK: token still well within the 7-day Testing-mode window.")
     return "ok", age_days
