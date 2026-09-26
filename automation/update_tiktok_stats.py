@@ -31,6 +31,11 @@ def main():
 
     with open(sys.argv[1]) as f:
         scraped_rows = json.load(f)  # newest-first, matches TikTok Studio's list order
+        # A row still "in moderation" has no stats yet but still occupies a
+        # position in TikTok's list -- the scraper is told to include it as
+        # {"views": null, ...} rather than drop it, specifically so dropping
+        # it here can't silently shift every older row's pairing by one (the
+        # same mis-attribution this whole order-based scheme exists to avoid).
 
     with locked_post_log() as entries:
         # post_log is appended in posting order (oldest-first). Only entries whose
@@ -51,9 +56,27 @@ def main():
                 "Matching only the first (newest) entries; extra scraped rows ignored.",
                 file=sys.stderr,
             )
+        elif len(scraped_rows) < len(tiktok_entries_newest_first):
+            print(
+                f"WARNING: scraped only {len(scraped_rows)} rows but "
+                f"{len(tiktok_entries_newest_first)} post_log entries are marked "
+                "tiktok-live -- a row may be missing from TikTok's list (deleted, "
+                "or the scrape didn't capture the full page). Matching only the "
+                "first (newest) entries; the oldest live entries beyond the "
+                "scraped rows are left untouched rather than guessed at.",
+                file=sys.stderr,
+            )
 
         updated = 0
+        skipped_no_stats = 0
         for entry, row in zip(tiktok_entries_newest_first, scraped_rows):
+            if row.get("views") is None:
+                # Still in moderation on TikTok's side -- no real stats yet.
+                # Consume this zip position without writing anything, so the
+                # positional pairing for every OLDER (still-to-come) row in
+                # this loop stays correct instead of shifting by one.
+                skipped_no_stats += 1
+                continue
             tt = entry["platforms"]["tiktok"]
             tt["views"] = row.get("views", 0)
             tt["likes"] = row.get("likes", 0)
@@ -61,7 +84,10 @@ def main():
             tt["stats_fetched_at"] = datetime.now(timezone.utc).isoformat()
             updated += 1
 
-    print(f"Updated TikTok stats for {updated} video(s), oldest-scraped-row matched last.")
+    print(
+        f"Updated TikTok stats for {updated} video(s), oldest-scraped-row matched last "
+        f"({skipped_no_stats} still in moderation, no stats yet)."
+    )
 
 
 if __name__ == "__main__":
