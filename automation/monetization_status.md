@@ -1,13 +1,13 @@
 # Monetization status
 
-_Last updated: 2026-09-24T12:36:23.271506+00:00_
+_Last updated: 2026-09-26T08:32:32.483386+00:00_
 
 ## YouTube
-- Subscribers: 18 / 1000 — [--------------------] 1.8%
-- Total lifetime views: 3,045 (46 videos)
-- Videos posted (90d): 46 / 3
-- Watch hours (365d): 4.6 / 4000 — [--------------------] 0.1%
-- Views (90d, Shorts-path proxy): 2,515 / 10,000,000 — [--------------------] 0.0%
+- Subscribers: 20 / 1000 — [--------------------] 2.0%
+- Total lifetime views: 7,297 (52 videos)
+- Videos posted (90d): 54 / 3
+- Watch hours (365d): 11.1 / 4000 — [--------------------] 0.3%
+- Views (90d, Shorts-path proxy): 5,192 / 10,000,000 — [--------------------] 0.1%
 
 **Entry-tier (Partner Program) eligible: not yet**
 **Full monetization eligible: not yet**

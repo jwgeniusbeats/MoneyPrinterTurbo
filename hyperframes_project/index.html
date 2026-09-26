@@ -1,0 +1,126 @@
+<!doctype html>
+<html
+  lang="en"
+  data-resolution="portrait"
+  data-composition-variables='[{"id":"hook","type":"string","label":"Hook line","default":"Did you know?","maxLength":40},{"id":"fact","type":"string","label":"Fact text","default":"Your brain treats social rejection like physical pain.","maxLength":220},{"id":"source","type":"string","label":"Source line","default":"Source: Eisenberger et al.","maxLength":60},{"id":"duration","type":"number","label":"Duration in seconds","default":8}]'
+>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <title>psych-fact-card</title>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        width: 1080px;
+        height: 1920px;
+        overflow: hidden;
+        background: #0b0b12;
+        font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+      }
+      #root {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        background: radial-gradient(circle at 50% 20%, #1b1b2e 0%, #0b0b12 65%);
+      }
+      #hook {
+        position: absolute;
+        top: 260px;
+        left: 80px;
+        right: 80px;
+        color: #8b8bff;
+        font-size: 44px;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        text-transform: uppercase;
+      }
+      #fact {
+        position: absolute;
+        top: 420px;
+        left: 80px;
+        right: 80px;
+        color: #f4f4f5;
+        font-size: 68px;
+        font-weight: 600;
+        line-height: 1.25;
+        letter-spacing: -0.02em;
+      }
+      #source {
+        position: absolute;
+        bottom: 140px;
+        left: 80px;
+        right: 80px;
+        color: #6b6b7d;
+        font-size: 32px;
+        font-weight: 400;
+      }
+      #badge {
+        position: absolute;
+        top: 140px;
+        left: 80px;
+        color: #f4f4f5;
+        font-size: 30px;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        opacity: 0.55;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="root"
+      class="clip"
+      data-composition-id="main"
+      data-start="0"
+      data-duration="8"
+      data-width="1080"
+      data-height="1920"
+    >
+      <div id="badge">Nognize</div>
+      <div id="hook">Did you know?</div>
+      <div id="fact">Your brain treats social rejection like physical pain.</div>
+      <div id="source">Source: Eisenberger et al.</div>
+    </div>
+    <script>
+      (function () {
+        var vars =
+          window.__hyperframes && typeof window.__hyperframes.getVariables === "function"
+            ? window.__hyperframes.getVariables()
+            : {};
+        if (vars.hook) document.getElementById("hook").textContent = vars.hook;
+        if (vars.fact) document.getElementById("fact").textContent = vars.fact;
+        if (vars.source) document.getElementById("source").textContent = vars.source;
+        var duration = typeof vars.duration === "number" && vars.duration > 0 ? vars.duration : 8;
+        document.getElementById("root").setAttribute("data-duration", String(duration));
+
+        var tl = gsap.timeline({ paused: true });
+        tl.fromTo("#badge", { opacity: 0, y: -12 }, { opacity: 0.55, y: 0, duration: 0.4 }, 0);
+        tl.fromTo("#hook", { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.5 }, 0.15);
+        tl.fromTo(
+          "#fact",
+          { opacity: 0, y: 32 },
+          { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" },
+          0.4,
+        );
+        tl.fromTo("#source", { opacity: 0 }, { opacity: 1, duration: 0.4 }, 1.1);
+        tl.to({}, { duration: Math.max(duration - 1.6, 0.1) }, 1.5);
+        window.__timelines["main"] = tl;
+        tl.seek(0);
+      })();
+    </script>
+  </body>
+</html>

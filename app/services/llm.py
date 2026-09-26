@@ -727,6 +727,30 @@ def _limit_script_text(text: str | None, max_length: int, field_name: str) -> st
     return value[:max_length]
 
 
+# LLM's schrijven vlot Unicode-varianten van koppeltekens/spaties in
+# samengestelde woorden (bv. "mirror‑neuron"). De burned-in-subtitle
+# font (MicrosoftYaHeiBold.ttc, een CJK-font) mist juist deze glyphs en
+# rendert ze als een zichtbaar tofu-blokje midden in de ondertiteling.
+# Vervangen door hun font-veilige ASCII/gewone-spatie-equivalent vóórdat
+# de tekst ooit TTS of subtitles bereikt, lost het bij de bron op i.p.v.
+# per font een allowlist te moeten onderhouden.
+_SCRIPT_GLYPH_SAFE_REPLACEMENTS = {
+    "‑": "-",  # non-breaking hyphen
+    "‒": "-",  # figure dash
+    "​": "",  # zero-width space
+    "﻿": "",  # BOM / zero-width no-break space
+    "⁠": "",  # word joiner
+    " ": " ",  # narrow no-break space
+    " ": " ",  # thin space
+}
+
+
+def _sanitize_script_glyphs(text: str) -> str:
+    for unsafe, safe in _SCRIPT_GLYPH_SAFE_REPLACEMENTS.items():
+        text = text.replace(unsafe, safe)
+    return text
+
+
 def _normalize_script_paragraph_number(paragraph_number: int | None) -> int:
     try:
         value = int(paragraph_number or MIN_SCRIPT_PARAGRAPH_NUMBER)
@@ -815,6 +839,7 @@ def generate_script(
         # Remove asterisks, hashes
         response = response.replace("*", "")
         response = response.replace("#", "")
+        response = _sanitize_script_glyphs(response)
 
         # Remove markdown syntax.  Use non-greedy .*? so each bracket/paren
         # group is removed independently; the greedy form would eat all text

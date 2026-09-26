@@ -18,6 +18,7 @@ from PIL import Image, UnidentifiedImageError
 from app.config import config
 from app.models.schema import MaterialInfo, VideoAspect, VideoConcatMode
 from app.services import (
+    draw_things,
     material_cache,
     metaso_minimax,
     ofox,
@@ -1466,6 +1467,61 @@ def generate_images_openai(
     return [item]
 
 
+def generate_images_draw_things(
+    search_term: str,
+    minimum_duration: int,
+    video_aspect: VideoAspect = VideoAspect.portrait,
+    save_dir: str = "",
+) -> List[MaterialInfo]:
+    """
+    用本地 Draw Things (免费、无 API key) 为一个脚本关键词生成一张图片并保存到本地。
+
+    与 generate_images_openai 保持同一签名和空列表失败约定，但完全本地运行，
+    没有付费/计费语义，失败即返回空列表让上层跳过继续，不需要"未确认任务"
+    这类远端状态处理。
+    """
+    aspect = VideoAspect(video_aspect)
+    clip_duration = max(int(minimum_duration), 1)
+    size = _openai_image_size(aspect)
+    try:
+        width_str, height_str = size.lower().split("x", 1)
+        width, height = int(width_str), int(height_str)
+    except (ValueError, AttributeError):
+        width, height = (1024, 1536) if aspect == VideoAspect.portrait else (1024, 1024)
+
+    try:
+        image_bytes = draw_things.generate_image(
+            prompt=_openai_image_prompt(search_term),
+            width=width,
+            height=height,
+        )
+    except draw_things.DrawThingsError as e:
+        logger.error(f"Draw Things image generation failed: term={search_term!r}, detail={e}")
+        return []
+
+    try:
+        image_path, actual_width, actual_height = _save_openai_image_file(
+            image_bytes, save_dir
+        )
+    except _OpenAIImageDecodeError as e:
+        logger.error(
+            "Draw Things response is not a decodable image, skipping term: "
+            f"term={search_term!r}, error={type(e).__name__}, detail={e}"
+        )
+        return []
+
+    item = MaterialInfo()
+    item.provider = "draw_things"
+    item.url = image_path
+    item.duration = clip_duration
+    item.source_info = {
+        "provider": "draw_things",
+        "search_term": search_term,
+        "rendition": {"id": None, "width": actual_width, "height": actual_height},
+    }
+    return [item]
+
+
 def _render_openai_image_video(image_path: str, clip_duration: int) -> str:
     """
     把生成的图片渲染成 mp4 片段，复用 local 素材的"图片 → 动态片段"管线。
@@ -1558,6 +1614,77 @@ def _download_videos_openai_image_on_demand(
             break
 
     logger.success(f"generated and rendered {len(video_paths)} image materials")
+    _persist_material_sources(task_id, material_sources)
+    return video_paths
+
+
+def _download_videos_draw_things_on_demand(
+    *,
+    task_id: str,
+    search_terms: List[str],
+    video_aspect: VideoAspect,
+    audio_duration: float,
+    max_clip_duration: int,
+    material_directory: str,
+) -> List[str]:
+    """
+    用本地 Draw Things 逐张生成图片素材，凑够所需总时长后停止。
+
+    与 openai_image 的按需流程一致，但完全本地免费生成，没有"已付费任务不
+    可撤销"的顾虑：单张失败直接跳过继续下一个关键词即可。
+    """
+    if not material_directory:
+        material_directory = utils.task_dir(task_id)
+
+    video_paths: List[str] = []
+    material_sources: list[dict[str, Any]] = []
+    total_duration = 0.0
+
+    try:
+        required_duration = float(audio_duration)
+    except (TypeError, ValueError):
+        required_duration = 0.0
+    if required_duration <= 0:
+        logger.warning(
+            "skip Draw Things generation because required audio duration is "
+            f"not positive: duration={audio_duration}"
+        )
+        _persist_material_sources(task_id, material_sources)
+        return video_paths
+
+    for search_term in search_terms:
+        items = generate_images_draw_things(
+            search_term=search_term,
+            minimum_duration=max_clip_duration,
+            video_aspect=video_aspect,
+            save_dir=material_directory,
+        )
+        for item in items:
+            video_file = _render_openai_image_video(item.url, max_clip_duration)
+            if not video_file:
+                continue
+            logger.info(f"image material rendered: {video_file}")
+            video_paths.append(video_file)
+            try:
+                material_sources.append(_material_source_record(item, video_file))
+            except Exception as source_error:
+                logger.warning(
+                    "failed to prepare generated material source record: "
+                    f"provider=draw_things, "
+                    f"error={type(source_error).__name__}, detail={source_error}"
+                )
+            total_duration += min(max_clip_duration, item.duration)
+            if total_duration >= required_duration:
+                break
+        if total_duration >= required_duration:
+            logger.info(
+                "generated Draw Things image materials cover the required "
+                f"duration, stop generating more: generated={total_duration:.1f}s, "
+                f"required={required_duration:.1f}s"
+            )
+            break
+
+    logger.success(f"generated and rendered {len(video_paths)} Draw Things image materials")
     _persist_material_sources(task_id, material_sources)
     return video_paths
 
@@ -1746,6 +1873,16 @@ def download_videos(
         # 所需时长立即停止。生成结果是一次性的本地图片文件，也不参与 24
         # 小时搜索缓存——缓存会让不同任务反复拿到同一张图。
         return _download_videos_openai_image_on_demand(
+            task_id=task_id,
+            search_terms=search_terms,
+            video_aspect=video_aspect,
+            audio_duration=audio_duration,
+            max_clip_duration=max_clip_duration,
+            material_directory=material_directory,
+        )
+    if source == "draw_things":
+        # 完全本地、免费生成：无远端计费，失败按素材源约定跳过继续即可。
+        return _download_videos_draw_things_on_demand(
             task_id=task_id,
             search_terms=search_terms,
             video_aspect=video_aspect,

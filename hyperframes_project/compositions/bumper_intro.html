@@ -1,0 +1,90 @@
+<!doctype html>
+<html
+  lang="en"
+  data-composition-variables='[{"id":"brand","type":"string","label":"Brand name","default":"Nognize","maxLength":24},{"id":"duration","type":"number","label":"Duration in seconds","default":1.2}]'
+>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <title>bumper-intro</title>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@800&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        width: 1080px;
+        height: 1920px;
+        overflow: hidden;
+        background: #0b0b12;
+        font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+      }
+      #root {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: radial-gradient(circle at 50% 50%, #1b1b2e 0%, #0b0b12 70%);
+      }
+      #brand {
+        color: #f4f4f5;
+        font-size: 96px;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+      }
+      #dot {
+        color: #8b8bff;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="root"
+      class="clip"
+      data-composition-id="main"
+      data-start="0"
+      data-duration="1.2"
+      data-width="1080"
+      data-height="1920"
+    >
+      <div id="brand">Nognize<span id="dot">.</span></div>
+    </div>
+    <script>
+      (function () {
+        var vars =
+          window.__hyperframes && typeof window.__hyperframes.getVariables === "function"
+            ? window.__hyperframes.getVariables()
+            : {};
+        if (vars.brand) {
+          document.getElementById("brand").firstChild.textContent = vars.brand;
+        }
+        var duration = typeof vars.duration === "number" && vars.duration > 0 ? vars.duration : 1.2;
+        document.getElementById("root").setAttribute("data-duration", String(duration));
+
+        var tl = gsap.timeline({ paused: true });
+        tl.fromTo(
+          "#brand",
+          { opacity: 0, scale: 0.85 },
+          { opacity: 1, scale: 1, duration: 0.4, ease: "back.out(2)" },
+          0,
+        );
+        tl.fromTo("#dot", { color: "#f4f4f5" }, { color: "#8b8bff", duration: 0.3 }, 0.3);
+        tl.to("#root", { opacity: 0, duration: 0.25 }, Math.max(duration - 0.25, 0.5));
+        window.__timelines["main"] = tl;
+        tl.seek(0);
+      })();
+    </script>
+  </body>
+</html>

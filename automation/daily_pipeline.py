@@ -28,6 +28,15 @@ from app.services import instagram_api, llm, meta_api, youtube_api  # noqa: E402
 from app.utils import utils  # noqa: E402
 from automation.post_log_lock import locked_post_log  # noqa: E402
 
+try:
+    # Losse, optionele stap (branded intro/outro + IG-carousel-stills) via
+    # heygen-com/hyperframes -- lokaal, geen API-kosten. Als Node/npx niet
+    # aanwezig is faalt alleen deze import; de rest van de pipeline draait
+    # gewoon door zonder bumpers/carousels (zie run_batch()).
+    from app.services import hyperframes as hyperframes_service
+except Exception:
+    hyperframes_service = None
+
 BACKLOG_FILE = os.path.join(BASE_DIR, "automation", "topic_backlog.json")
 STATE_FILE = os.path.join(BASE_DIR, "automation", "schedule_state.json")
 MANUAL_REMINDER_FILE = os.path.join(BASE_DIR, "automation", "manual_post_queue.txt")
@@ -42,14 +51,14 @@ MAX_VIDEO_SCRIPT_PROMPT_LENGTH = 2000
 # drive traffic there, not just the bio itself, since that's the one owned
 # asset that doesn't depend on any single platform's algorithm or payout
 # threshold.
-LINK_IN_BIO_URL = "tinyurl.com/ycxk9x6u"
+LINK_IN_BIO_URL = "tinyurl.com/nognize"
 # The old tinyurl.com/238zsuaa link was created via TinyURL's now-deprecated
 # API endpoint -- confirmed 2026-09-24 it now shows a cookie-consent wall
 # plus a 10-second "Preview" countdown before redirecting, instead of an
 # instant redirect. Every video's CTA had been sending traffic through that
-# friction the whole time. Replaced with a fresh link (created via TinyURL's
-# current form) pointing at the same destination -- verified instant 301,
-# no interstitial.
+# friction the whole time. First replaced with a random-string fresh link
+# (tinyurl.com/ycxk9x6u), then upgraded to this branded alias the same day
+# -- both verified instant 301, no interstitial.
 LINK_IN_BIO_CTA = f"\n\n\U0001f517 More facts + early access: {LINK_IN_BIO_URL}"
 CET_ZONE = ZoneInfo("Europe/Amsterdam")  # DST-aware CET/CEST, no manual offset to maintain
 COMPILATION_LOG_FILE = os.path.join(BASE_DIR, "automation", "compilation_log.json")
@@ -334,6 +343,48 @@ def next_slot_utc(state: dict) -> datetime:
     return candidate_cet.astimezone(timezone.utc)
 
 
+def _apply_hyperframes_bumpers(video_path: str, subject: str) -> str:
+    """
+    Plakt de Nognize-intro/outro-bumper (hyperframes, lokaal, gratis) om een
+    klaar-gerenderde video heen. Best-effort: bij elke fout (Node ontbreekt,
+    ffmpeg-concat faalt, timeout) wordt de ORIGINELE video_path teruggegeven
+    en gaat de rest van de pipeline gewoon door -- een bumper-fout mag nooit
+    een succesvolle video laten mislukken.
+    """
+    if hyperframes_service is None or not hyperframes_service.is_available():
+        return video_path
+    try:
+        bumpered = hyperframes_service.add_bumpers(video_path)
+        return str(bumpered)
+    except Exception as e:
+        print(f"hyperframes bumper mislukt (non-fatal) voor {subject!r}: {e}")
+        return video_path
+
+
+def _generate_hyperframes_carousel(subject: str, script: str) -> list[str] | None:
+    """
+    Genereert best-effort een 3-slide IG-carousel (hook/fact/cta) uit het
+    script van dezelfde video, via hyperframes (lokaal, gratis, 4:5-stills).
+    Geeft None terug bij falen -- geen carousel is geen pipeline-fout.
+    """
+    if hyperframes_service is None or not hyperframes_service.is_available():
+        return None
+    try:
+        sentences = [s.strip() for s in script.replace("\n", " ").split(".") if s.strip()]
+        hook = (sentences[0] + ".") if sentences else subject
+        fact = ". ".join(sentences[1:]) or script
+        slides = [
+            hyperframes_service.CarouselSlideSpec(kind="hook", text=hook[:80]),
+            hyperframes_service.CarouselSlideSpec(kind="fact", text=fact[:220]),
+            hyperframes_service.CarouselSlideSpec(kind="cta", text="Follow @nognize for more"),
+        ]
+        paths = hyperframes_service.render_carousel(slides)
+        return [str(p) for p in paths]
+    except Exception as e:
+        print(f"hyperframes carousel mislukt (non-fatal) voor {subject!r}: {e}")
+        return None
+
+
 def run_batch(topics: list) -> list:
     import random
 
@@ -439,15 +490,19 @@ def run_batch(topics: list) -> list:
     for task in summary.get("tasks", []):
         if task.get("status") == "succeeded":
             r = task["result"]
+            subject = topics[task["index"] - 1]
+            final_video = _apply_hyperframes_bumpers(r["videos"][0], subject)
+            carousel_slides = _generate_hyperframes_carousel(subject, r["script"])
             succeeded.append(
                 {
                     "task_id": r.get("task_id") or task.get("task_id"),
                     "topic_index": task["index"] - 1,
-                    "video_subject": topics[task["index"] - 1],
+                    "video_subject": subject,
                     "script": r["script"],
-                    "final_video": r["videos"][0],
+                    "final_video": final_video,
                     "combined_video": r["combined_videos"][0] if r.get("combined_videos") else None,
                     "subtitle_display_mode": subtitle_modes[task["index"] - 1],
+                    "carousel_slides": carousel_slides,
                 }
             )
     return succeeded
@@ -837,10 +892,17 @@ def main():
         with locked_post_log() as fresh_log:
             fresh_log.append(log_entry)
 
-        manual_lines.append(
+        manual_line = (
             f"=== {title} ===\nFile: {labeled_path}\nCaption:\n{description}\n"
-            f"Suggested time: {slot_dt.isoformat()} (UTC) -> post manually on TikTok\n\n"
+            f"Suggested time: {slot_dt.isoformat()} (UTC) -> post manually on TikTok\n"
         )
+        carousel_slides = item.get("carousel_slides")
+        if carousel_slides:
+            manual_line += (
+                "IG carousel (optional, post manually, not auto-posted):\n"
+                + "\n".join(f"  {p}" for p in carousel_slides) + "\n"
+            )
+        manual_lines.append(manual_line + "\n")
 
     if manual_lines:
         with open(MANUAL_REMINDER_FILE, "a") as f:

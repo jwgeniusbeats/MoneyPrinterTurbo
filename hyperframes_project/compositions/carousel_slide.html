@@ -1,0 +1,152 @@
+<!doctype html>
+<html
+  lang="en"
+  data-composition-variables='[{"id":"kind","type":"string","label":"Slide kind: hook | fact | cta","default":"hook","maxLength":10},{"id":"text","type":"string","label":"Slide text","default":"Did you know?","maxLength":260},{"id":"index","type":"number","label":"Slide index (1-based)","default":1},{"id":"total","type":"number","label":"Total slides","default":3},{"id":"brand","type":"string","label":"Brand name","default":"Nognize","maxLength":24}]'
+>
+  <head>
+    <meta charset="UTF-8" />
+    <!-- IG feed carousel max portrait ratio is 4:5 (1080x1350) -- NOT the
+         9:16 reels/shorts canvas the other compositions in this project use. -->
+    <meta name="viewport" content="width=1080, height=1350" />
+    <title>carousel-slide</title>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        width: 1080px;
+        height: 1350px;
+        overflow: hidden;
+        background: #0b0b12;
+        font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+      }
+      #root {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        background: radial-gradient(circle at 50% 15%, #1b1b2e 0%, #0b0b12 65%);
+      }
+      #badge {
+        position: absolute;
+        top: 96px;
+        left: 80px;
+        color: #f4f4f5;
+        font-size: 28px;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        opacity: 0.55;
+      }
+      #dots {
+        position: absolute;
+        top: 96px;
+        right: 80px;
+        display: flex;
+        gap: 10px;
+      }
+      .dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: rgba(244, 244, 245, 0.25);
+      }
+      .dot.active {
+        background: #8b8bff;
+      }
+      #text {
+        position: absolute;
+        left: 80px;
+        right: 80px;
+        top: 45%;
+        transform: translateY(-50%);
+        color: #f4f4f5;
+        font-size: 68px;
+        font-weight: 600;
+        line-height: 1.25;
+        letter-spacing: -0.02em;
+      }
+      #text.kind-hook {
+        font-weight: 800;
+        color: #8b8bff;
+        text-transform: uppercase;
+        font-size: 76px;
+      }
+      #text.kind-cta {
+        font-weight: 800;
+        text-align: center;
+        left: 90px;
+        right: 90px;
+      }
+      #swipe-hint {
+        position: absolute;
+        bottom: 80px;
+        left: 0;
+        right: 0;
+        text-align: center;
+        color: #6b6b7d;
+        font-size: 30px;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="root"
+      class="clip"
+      data-composition-id="main"
+      data-start="0"
+      data-duration="1.2"
+      data-width="1080"
+      data-height="1350"
+    >
+      <div id="badge">Nognize</div>
+      <div id="dots"></div>
+      <div id="text" class="kind-hook">Did you know?</div>
+      <div id="swipe-hint">Swipe →</div>
+    </div>
+    <script>
+      (function () {
+        var vars =
+          window.__hyperframes && typeof window.__hyperframes.getVariables === "function"
+            ? window.__hyperframes.getVariables()
+            : {};
+        var kind = vars.kind || "hook";
+        var text = vars.text || "Did you know?";
+        var index = typeof vars.index === "number" ? vars.index : 1;
+        var total = typeof vars.total === "number" ? vars.total : 3;
+        var brand = vars.brand || "Nognize";
+
+        document.getElementById("badge").textContent = brand;
+        var textEl = document.getElementById("text");
+        textEl.textContent = text;
+        textEl.className = "kind-" + kind;
+
+        var dotsEl = document.getElementById("dots");
+        for (var i = 1; i <= total; i++) {
+          var d = document.createElement("div");
+          d.className = "dot" + (i === index ? " active" : "");
+          dotsEl.appendChild(d);
+        }
+        var hint = document.getElementById("swipe-hint");
+        hint.style.display = index < total ? "block" : "none";
+
+        var tl = gsap.timeline({ paused: true });
+        tl.fromTo(textEl, { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.5 }, 0.1);
+        tl.fromTo("#badge, #dots", { opacity: 0 }, { opacity: 1, duration: 0.3 }, 0);
+        tl.to({}, { duration: 0.4 }, 0.7);
+        window.__timelines["main"] = tl;
+        tl.seek(0);
+      })();
+    </script>
+  </body>
+</html>
