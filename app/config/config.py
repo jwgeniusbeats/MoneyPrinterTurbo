@@ -585,6 +585,16 @@ app["redis_host"] = os.getenv(
     os.getenv("REDIS_HOST", app.get("redis_host", "localhost")),
 )
 
+# config.toml lives only on disk (gitignored, never in the cloud) -- these let a
+# cloud Routine or CI run supply the LLM provider/key via environment variables
+# (set in the environment's own secrets, never pasted into a chat) instead of
+# needing a checked-out config.toml with real keys in it.
+app["llm_provider"] = os.getenv("MPT_LLM_PROVIDER", app.get("llm_provider", ""))
+app["gemini_api_key"] = os.getenv("GEMINI_API_KEY", app.get("gemini_api_key", ""))
+app["gemini_model_name"] = os.getenv(
+    "GEMINI_MODEL_NAME", app.get("gemini_model_name", "")
+)
+
 ffmpeg_path = app.get("ffmpeg_path", "")
 if ffmpeg_path and os.path.isfile(ffmpeg_path):
     os.environ["IMAGEIO_FFMPEG_EXE"] = ffmpeg_path
