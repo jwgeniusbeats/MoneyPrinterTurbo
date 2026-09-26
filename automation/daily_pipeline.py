@@ -42,6 +42,7 @@ STATE_FILE = os.path.join(BASE_DIR, "automation", "schedule_state.json")
 MANUAL_REMINDER_FILE = os.path.join(BASE_DIR, "automation", "manual_post_queue.txt")
 POST_LOG_FILE = os.path.join(BASE_DIR, "automation", "post_log.json")
 LEARNINGS_FILE = os.path.join(BASE_DIR, "automation", "learnings.md")
+INSPIRATION_FILE = os.path.join(BASE_DIR, "automation", "content_inspiration.md")
 VIDEOS_PER_RUN = 4
 # Must match app.models.schema.VideoParams.video_script_prompt's
 # Field(max_length=...) exactly -- see run_batch() for why going over this
@@ -225,6 +226,17 @@ def load_learnings() -> str:
     if not os.path.exists(LEARNINGS_FILE):
         return ""
     with open(LEARNINGS_FILE) as f:
+        return f.read().strip()
+
+
+def load_inspiration() -> str:
+    """Structural formats/angles logged by hand during engagement rounds
+    (automation/content_inspiration.md) -- that file's own "How to apply"
+    section already said to feed it into topic refills, nothing did until
+    now."""
+    if not os.path.exists(INSPIRATION_FILE):
+        return ""
+    with open(INSPIRATION_FILE) as f:
         return f.read().strip()
 
 
@@ -582,13 +594,19 @@ def fetch_trending_seeds(max_seeds: int = 4, max_per_seed: int = 5) -> list[str]
     return suggestions
 
 
-def generate_new_topics(n: int, learnings: str, existing: list) -> list:
+def generate_new_topics(n: int, learnings: str, existing: list, inspiration: str = "") -> list:
     """Auto-refill the topic backlog with new psychology/mind-facts angles
     once it's running low, so the channel never silently starves for topics.
     Informed by learnings.md when available, to lean into what performs."""
     guidance = (
         f"\n\nHere is what has performed well on this channel so far, lean into similar angles:\n{learnings}"
         if learnings else ""
+    )
+    inspiration_guidance = (
+        "\n\nStructural formats/angles worth adapting, logged from other accounts "
+        "during engagement rounds (steal the structure, not the content itself):\n"
+        + inspiration
+        if inspiration else ""
     )
     trends = fetch_trending_seeds()
     trend_guidance = (
@@ -606,6 +624,7 @@ def generate_new_topics(n: int, learnings: str, existing: list) -> list:
         "someone stop scrolling. Avoid these already-used topics:\n"
         + "\n".join(f"- {t}" for t in existing[-30:])
         + guidance
+        + inspiration_guidance
         + trend_guidance
         + f"\n\nReply with exactly {n} lines, one topic per line, no numbering, no extra text."
     ).format(n=n)
@@ -756,7 +775,7 @@ def main():
     if len(remaining_backlog) < BACKLOG_REFILL_THRESHOLD:
         try:
             new_topics = generate_new_topics(
-                BACKLOG_REFILL_COUNT, load_learnings(), backlog
+                BACKLOG_REFILL_COUNT, load_learnings(), backlog, load_inspiration()
             )
             if new_topics:
                 remaining_backlog = remaining_backlog + new_topics
