@@ -52,6 +52,13 @@ Videos/
 automation/post_log.json.lock
 resources/
 
+# Runtime output from the daily token-health checks (launchd StandardOut/
+# StandardErrorPath), not source.
+automation/youtube_token_health.log
+automation/youtube_token_health.error.log
+automation/facebook_token_health.log
+automation/facebook_token_health.error.log
+
 # Clip service: client uploads/downloads and large generated media, not
 # source. orders/ can hold a buyer's actual video, keeping it out of git
 # matters for their privacy, not just repo size.
