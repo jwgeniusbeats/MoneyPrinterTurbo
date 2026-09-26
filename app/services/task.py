@@ -306,6 +306,15 @@ def generate_script(task_id, params):
         _mark_task_failed(task_id, "script", "failed to generate video script")
         return None
 
+    # subtitle.srt is generated verbatim from this text (see generate_subtitle
+    # below) and burned in with display fonts that have no emoji glyphs --
+    # strip here so TTS and the subtitle see the same emoji-free text instead
+    # of a stray emoji surviving into the video as a tofu block.
+    video_script = utils.strip_emoji(video_script)
+    if not video_script:
+        _mark_task_failed(task_id, "script", "video script was empty after removing emoji")
+        return None
+
     return video_script
 
 

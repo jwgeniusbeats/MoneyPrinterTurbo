@@ -400,6 +400,36 @@ MIN_PAUSE_DURATION_SECONDS = 0.1
 MAX_PAUSE_DURATION_SECONDS = 10.0
 
 
+EMOJI_PATTERN = re.compile(
+    "["
+    "\U0001F300-\U0001FAFF"
+    "\U00002600-\U000027BF"
+    "\U0001F1E6-\U0001F1FF"
+    "\U00002B00-\U00002BFF"
+    "\U0001F000-\U0001F0FF"
+    "\U0000FE0F"
+    "]+",
+    flags=re.UNICODE,
+)
+
+
+def strip_emoji(text: str) -> str:
+    """
+    移除脚本文案中的 emoji。
+
+    脚本文案会同时用于 TTS 朗读和逐字幕匹配（subtitle.srt 直接取自 video_script）。
+    项目使用的字幕字体（Anton/BebasNeue/Charm/UTM Kabel KT 等）都不含 emoji 字形，
+    subtitle_font_supports_text() 的检测样本又只取 Unicode 字母/数字类别，emoji 属于
+    Symbol 类别不会被检测到，导致 emoji 被直接烧录进画面时渲染成方块（tofu）。
+    在脚本生成后立即清除，确保 TTS 音频与字幕看到的是同一份干净文本。
+    """
+    if not text:
+        return text
+    cleaned = EMOJI_PATTERN.sub("", text)
+    cleaned = re.sub(r"[ \t]+", " ", cleaned)
+    return cleaned.strip()
+
+
 def has_pause_tags(text: str) -> bool:
     """检查文本中是否包含停顿/暂停标签。"""
     if not text:
