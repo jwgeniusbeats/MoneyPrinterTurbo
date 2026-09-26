@@ -25,4 +25,6 @@ _Last updated: 2026-09-26T08:32:32.483386+00:00_
 
 ## Instagram / Facebook (no comparable program to track)
 - Instagram has no universal ad-revenue program in most regions — monetization here realistically means affiliate links, sponsorships, or Instagram Shopping once there's an audience.
-- Facebook in-stream ads need Page watch-time eligibility (checked in Meta Business Suite directly, not via this script).
+- Facebook In-Stream Ads was discontinued by Meta on 2025-08-31 -- do not chase that program, it no longer exists.
+- Replaced by **Facebook Content Monetization** (invite-only; ~10k Page followers + 600k watch-minutes/60d per third-party estimates, not confirmed via Meta's own docs).
+- **Creator Fast Track** (launched 2026-03) is the more realistic route for this account: entry bar is 30,000 video views in the last 60 days on *any* of Instagram/TikTok/YouTube (not Facebook itself), requires 15 Reels/month for full payout. Check real-time status in-app: Professional Dashboard -> Monetization -> Content Monetization (checked manually, not via this script).
