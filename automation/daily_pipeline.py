@@ -24,7 +24,7 @@ from zoneinfo import ZoneInfo
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, BASE_DIR)
 
-from app.services import instagram_api, llm, meta_api, youtube_api  # noqa: E402
+from app.services import instagram_api, llm, meta_api, tiktok_api, youtube_api  # noqa: E402
 from app.utils import utils  # noqa: E402
 from automation.post_log_lock import locked_post_log  # noqa: E402
 
@@ -902,7 +902,33 @@ def main():
         if meta_variant_path != video_path and os.path.exists(meta_variant_path):
             os.remove(meta_variant_path)
 
-        log_entry["platforms"]["tiktok"] = {"status": "pending_manual"}
+        tiktok_posted_directly = False
+        if tiktok_api.production_ready():
+            # Audit has passed and the token was obtained against the
+            # Production app (see tiktok_api.production_ready()) -- post for
+            # real instead of queuing a manual reminder nobody was acting on
+            # anyway (0/54 queued videos ever got manually posted as of
+            # 2026-09-26).
+            try:
+                status = tiktok_api.upload_video_direct_post(
+                    video_path=labeled_path,
+                    title=description[:2200],
+                    privacy_level="PUBLIC_TO_EVERYONE",
+                )
+                post_ids = status.get("publicaly_available_post_id") or []
+                log_entry["platforms"]["tiktok"] = {
+                    "id": post_ids[0] if post_ids else None,
+                    "status": "live",
+                    "posted_at": datetime.now(timezone.utc).isoformat(),
+                }
+                print(f"TikTok posted directly: {post_ids[0] if post_ids else '(no id returned)'}")
+                tiktok_posted_directly = True
+            except Exception as e:
+                print(f"TikTok direct post failed for {subject}, falling back to manual queue: {e}")
+
+        if not tiktok_posted_directly:
+            log_entry["platforms"]["tiktok"] = {"status": "pending_manual"}
+
         # Append under lock against a freshly-read copy, not the in-memory
         # `post_log` loaded once at the top of main() -- a full run can span
         # 30-90+ minutes across several videos' platform uploads, plenty of
@@ -911,17 +937,23 @@ def main():
         with locked_post_log() as fresh_log:
             fresh_log.append(log_entry)
 
-        manual_line = (
-            f"=== {title} ===\nFile: {labeled_path}\nCaption:\n{description}\n"
-            f"Suggested time: {slot_dt.isoformat()} (UTC) -> post manually on TikTok\n"
-        )
+        # The IG-carousel reminder is unrelated to whether TikTok posted
+        # automatically -- carousels are never auto-posted regardless, so
+        # this must not get silently dropped just because TikTok succeeded.
         carousel_slides = item.get("carousel_slides")
-        if carousel_slides:
-            manual_line += (
-                "IG carousel (optional, post manually, not auto-posted):\n"
-                + "\n".join(f"  {p}" for p in carousel_slides) + "\n"
-            )
-        manual_lines.append(manual_line + "\n")
+        if not tiktok_posted_directly or carousel_slides:
+            manual_line = f"=== {title} ===\nFile: {labeled_path}\n"
+            if not tiktok_posted_directly:
+                manual_line += (
+                    f"Caption:\n{description}\n"
+                    f"Suggested time: {slot_dt.isoformat()} (UTC) -> post manually on TikTok\n"
+                )
+            if carousel_slides:
+                manual_line += (
+                    "IG carousel (optional, post manually, not auto-posted):\n"
+                    + "\n".join(f"  {p}" for p in carousel_slides) + "\n"
+                )
+            manual_lines.append(manual_line + "\n")
 
     if manual_lines:
         with open(MANUAL_REMINDER_FILE, "a") as f:

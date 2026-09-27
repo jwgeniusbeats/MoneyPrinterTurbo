@@ -85,6 +85,28 @@ def _get_access_token() -> str:
     return token["access_token"]
 
 
+def production_ready() -> bool:
+    """True once both (a) the Production app credentials file exists and
+    (b) the stored token was itself obtained via that Production app's OAuth
+    flow -- a Sandbox-issued token can't just be reused against Production
+    credentials, TikTok ties the token's posting privileges to the specific
+    app it was granted under. (b) still requires the one-time human consent
+    click against the Production app after the audit passes; this only
+    detects that it has already happened, never triggers it. Callers use
+    this to decide whether to attempt a real public post at all, since
+    Sandbox-only posting can only publish SELF_ONLY (private), which is
+    useless for actual distribution."""
+    if not os.path.exists(PRODUCTION_APP_FILE):
+        return False
+    if not os.path.exists(TOKEN_FILE):
+        return False
+    try:
+        token = _load_token()
+    except (OSError, json.JSONDecodeError):
+        return False
+    return token.get("sandbox") is False
+
+
 def upload_video_direct_post(
     video_path: str,
     title: str = "",
