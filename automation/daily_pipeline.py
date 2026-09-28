@@ -600,6 +600,15 @@ def generate_new_topics(n: int, learnings: str, existing: list, inspiration: str
     Informed by learnings.md when available, to lean into what performs."""
     guidance = (
         f"\n\nHere is what has performed well on this channel so far, lean into similar angles:\n{learnings}"
+        "\n\nPay special attention to the \"Average total views by hook type\" section above if "
+        "present -- phrase new topics so their eventual title would naturally fall into the "
+        "best-performing hook type(s), and avoid phrasing that falls into the worst-performing "
+        "one(s). Hook types map to title phrasing like this: a title starting with \"Why\" is "
+        "why_hook, starting with \"How\" is how_hook, starting with a number is listicle_hook, "
+        "containing \"?\" is question_hook, containing \"secret\"/\"reason\"/\"no one\"/\"nobody\" "
+        "is curiosity_hook, anything else (a direct declarative statement) is statement_hook. "
+        "This guidance should shift as the data above shifts -- don't hardcode today's ranking "
+        "in your reasoning, just read whatever ranking is actually shown above each time."
         if learnings else ""
     )
     inspiration_guidance = (
