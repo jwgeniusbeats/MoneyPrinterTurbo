@@ -380,7 +380,7 @@ ollama_model_name = ""
 #     a long-lived token from `claude setup-token` exported as
 #     CLAUDE_CODE_OAUTH_TOKEN (needed for Docker)
 # Leave model_name empty to use the CLI's current default model, or set one such
-# as "claude-opus-5" / "claude-sonnet-5". Leave cli_path empty to resolve
+# as "claude-opus-5-5" / "claude-sonnet-5-5". Leave cli_path empty to resolve
 # `claude` from PATH. Leave timeout empty to use the 300s default.
 # Calls use your Claude subscription usage limits; conflicting ANTHROPIC_* and
 # CLAUDE_CODE_USE_* environment variables are removed before the CLI runs.
