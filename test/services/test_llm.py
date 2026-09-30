@@ -298,7 +298,7 @@ class TestLiteLLMProvider(unittest.TestCase):
         """WebUI 与服务层必须共享同一组默认模型，避免展示值和请求值漂移。"""
         self.assertEqual(get_llm_provider("openai").default_model, "gpt-5.5")
         anthropic = get_llm_provider("anthropic")
-        self.assertEqual(anthropic.default_model, "claude-sonnet-5")
+        self.assertEqual(anthropic.default_model, "claude-sonnet-5-5")
         self.assertEqual(anthropic.default_base_url, "https://api.anthropic.com/v1/")
         self.assertEqual(anthropic.adapter, "openai_compatible")
         self.assertTrue(anthropic.requires_api_key)
@@ -793,7 +793,7 @@ class TestLiteLLMProvider(unittest.TestCase):
         self.assertEqual(
             fake_completions.kwargs,
             {
-                "model": "claude-sonnet-5",
+                "model": "claude-sonnet-5-5",
                 "messages": [{"role": "user", "content": "Say hello"}],
             },
         )
