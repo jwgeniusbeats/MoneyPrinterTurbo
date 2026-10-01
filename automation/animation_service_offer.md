@@ -54,19 +54,54 @@ captions. Customer supplies the message; we deliver MP4 plus the editable HTML.
 Render command (needs `playwright` for Node, ffmpeg, Chromium):
 ```
 node automation/animation/render.mjs automation/animation/sample_coach.json out.mp4
-# optional voice-over: add  --audio voice.mp3
+# silent. With voice and music: see the voice section below
 ```
 On the Mac: `npm i playwright && npx playwright install chromium` once, and
 ffmpeg is already there for the pipeline. If Chromium lives elsewhere, set
 `CHROMIUM_PATH`.
 
+## Voice-over, music, cloned voice (added 2026-10-01)
+`automation/animation/build_audio.py` makes the audio and times the scenes
+from the real audio length, so nothing is timed by hand any more:
+```
+python automation/animation/build_audio.py script.json --out-dir build/ --music generate
+node automation/animation/render.mjs build/script.timed.json out.mp4 --audio build/mix.wav
+```
+- **Standard voice:** the local Kokoro server (port 8880, already used by the
+  pipeline). Tested in the cloud container with real Kokoro (24 s clip,
+  4 scenes). Voices: `--voice af_heart`, `bf_emma`, `am_adam`, ...
+- **Customer's own voice, route 1 (recommended): they record it.** Ask for
+  one clip per scene, name them `scene_01.m4a`, `scene_02.m4a` ... and use
+  `--voice-dir`. No cloning, no consent problems. Not run with real customer
+  files yet; the code converts any audio format through ffmpeg.
+- **Customer's own voice, route 2: cloned.** Needs a Chatterbox server
+  (already supported in `app/services/voice.py`, open source, zero-shot
+  cloning from a short reference clip). NOT tested: Chatterbox is not
+  installed in the cloud container and I have not run it on the Mac. The
+  voice name is whatever the Chatterbox server calls the uploaded reference;
+  check that server's README for how to upload one, then pass it as
+  `--base-url http://127.0.0.1:4123/v1 --voice <name> --model chatterbox`.
+  Expect quality to depend heavily on the reference recording (guessing).
+- **Cloning rules (non-negotiable):** only the voice of the person ordering,
+  with their written OK in the Fiverr chat. Never a third party's voice, never
+  a public figure. Check Fiverr's current rules on AI-generated voice before
+  offering this as a paid add-on.
+- **Music:** `--music generate` makes a plain licence-free ambient pad
+  (synthesised, so no copyright question) and `--music track.mp3` mixes a
+  real track under the voice; the music ducks automatically when the voice
+  speaks. Do NOT use `resource/songs/` for customers: where those files come
+  from and under what licence is unknown to me. Use a track whose licence
+  allows commercial use (check the licence per track) or one the customer
+  supplies.
+
 ## Known limits (be honest with customers)
-- No voice-over is generated automatically. Scene lengths (`dur`) are set by
-  hand, so with a voice-over you must adjust `dur` to match the audio
-  (Kokoro on the Mac can make the MP3; timing alignment is manual for now).
+- Item reveals inside a scene are spread over the scene, not tied to the exact
+  word being spoken. Captions follow the voice by word length, not by true
+  word timing (Whisper could improve that later).
 - Style is clean cartoon/whiteboard, not custom illustration. Customers who
   want branded characters or logos animated need extra work.
 - Only 5 scene types. A new layout means editing `template.html`.
+- The generated music bed is basic. A real track sounds better.
 
 ## Fiverr gig (copy-paste)
 **Title:** I will create a hand-drawn style animated explainer short for your business

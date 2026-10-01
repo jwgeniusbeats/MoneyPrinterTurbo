@@ -63,8 +63,14 @@ function text(txt,x,y,size,p,opts){ // typewriter text, centered by default; ret
 }
 function caption(sc,lt){ // word-by-word caption, 4-word chunks, active word highlighted
   if(!sc.say)return;
-  const words=sc.say.split(/\s+/);const per=(sc.dur-.4)/words.length;
-  const idx=Math.min(words.length-1,Math.max(0,Math.floor((lt-.15)/per)));
+  const words=sc.say.split(/\s+/);
+  // timing: with real audio (build_audio.py sets lead/speech) words are spread by length over the speech;
+  // without it they are spread over the scene
+  const start=sc.lead!=null?sc.lead:.15, span=sc.speech!=null?sc.speech:(sc.dur-.4);
+  const wts=words.map(w=>w.length+2), sum=wts.reduce((a,b)=>a+b,0);
+  let acc=0,idx=words.length-1; const u=(lt-start)/span*sum;
+  for(let i=0;i<words.length;i++){acc+=wts[i];if(u<acc){idx=i;break;}}
+  if(lt<start)idx=0;
   const c0=Math.floor(idx/4)*4,chunk=words.slice(c0,c0+4);
   g.font='700 66px BeVN';g.textBaseline='middle';g.textAlign='left';
   const sp=g.measureText(' ').width;let tw=0;const ws=chunk.map(w=>{const m=g.measureText(w).width;tw+=m;return m;});tw+=sp*(chunk.length-1);
