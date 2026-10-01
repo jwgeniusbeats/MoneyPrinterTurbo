@@ -1,0 +1,18 @@
+{
+  "accent": "#7a3ae8",
+  "accent2": "#1fa37a",
+  "handle": "@yourproduct",
+  "scenes": [
+    {"kind": "hook", "dur": 4, "title": "Why new users never come back",
+     "say": "Why do new users sign up and never come back?"},
+    {"kind": "compare", "dur": 10, "title": "Two first screens",
+     "left": {"head": "Lost", "items": ["Empty dashboard", "Ten menu items"]},
+     "right": {"head": "Guided", "items": ["One clear task", "Quick first win"]},
+     "say": "An empty dashboard and ten menu items leave people lost. One clear task and a quick first win bring them back."},
+    {"kind": "steps", "dur": 10, "title": "Fix onboarding",
+     "items": ["Ask one question", "Show one result", "Send one nudge"],
+     "say": "Ask one question. Show one result in the first minute. Then send one helpful nudge the next day."},
+    {"kind": "cta", "dur": 5, "title": "Give users a win in minute one",
+     "say": "Give every new user a win in the very first minute."}
+  ]
+}

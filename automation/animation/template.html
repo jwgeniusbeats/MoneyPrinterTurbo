@@ -132,10 +132,10 @@ const K={
     const p=ease(lt/.6);
     text(sc.title,W/2,520,120,clamp(lt/1.4),{maxw:940});
     const hh=wrap(sc.title,'120px Anton',940).length*138;
-    wline(W/2,520+hh+60,W/2,520+hh+260,ease((lt-1.2)/.6),12,ACC);
-    wline(W/2,520+hh+260,W/2-70,520+hh+190,ease((lt-1.7)/.3),12,ACC);
-    wline(W/2,520+hh+260,W/2+70,520+hh+190,ease((lt-1.7)/.3),12,ACC);
-    if(S.handle) text(S.handle,W/2,520+hh+330,72,clamp((lt-2)/1),{col:ACC2,maxw:900});
+    wline(W/2,520+hh+60,W/2,520+hh+260,ease((lt-.8)/.5),12,ACC);
+    wline(W/2,520+hh+260,W/2-70,520+hh+190,ease((lt-1.2)/.25),12,ACC);
+    wline(W/2,520+hh+260,W/2+70,520+hh+190,ease((lt-1.2)/.25),12,ACC);
+    if(S.handle) text(S.handle,W/2,520+hh+330,72,clamp((lt-1.4)/.8),{col:ACC2,maxw:900});
   }
 };
 window.seek=function(t){
