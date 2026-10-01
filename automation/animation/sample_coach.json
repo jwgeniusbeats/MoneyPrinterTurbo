@@ -1,0 +1,18 @@
+{
+  "accent": "#e8573a",
+  "accent2": "#2f7d6d",
+  "handle": "@yourcoachbrand",
+  "scenes": [
+    {"kind": "hook", "dur": 4.5, "title": "Why clients vanish after session one",
+     "say": "Why do clients vanish right after the first session?"},
+    {"kind": "steps", "dur": 12, "title": "3 quiet reasons",
+     "items": ["No clear next step", "Too much homework", "Price surprise later"],
+     "say": "Usually it is one of three quiet things. They leave without a clear next step. You hand them too much homework. Or the price comes as a surprise afterwards."},
+    {"kind": "compare", "dur": 10, "title": "Small fix, big change",
+     "left": {"head": "Ghosted", "items": ["Vague goodbye", "Invoice later"]},
+     "right": {"head": "Booked", "items": ["Next date set", "One small action"]},
+     "say": "Replace the vague goodbye with a booked date. Replace the invoice later with one small action they can finish today."},
+    {"kind": "cta", "dur": 5, "title": "Book the next step before they leave",
+     "say": "Book the next step before they even leave the call."}
+  ]
+}
