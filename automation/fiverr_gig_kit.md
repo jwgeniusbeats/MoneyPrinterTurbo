@@ -102,3 +102,73 @@ I build short hand-drawn style animated explainers for coaches, creators and sma
 - Deliver one day early. Ask for the review after delivery, never before.
 - If the buyer's request does not fit the template (custom characters, long video),
   say so before they order.
+
+
+---
+
+# v2: narrow niche version (2026-10-02), use THIS one for traction
+
+Reason: a generic "animated explainer" gig is lost among established sellers with
+reviews. A new seller with zero reviews needs a narrow niche, a low entry price for
+the first reviews, and a bundle for repeat orders. This is a judgement call, not
+tested. The first version above stays as a fallback. All fields are within the
+limits from the v1 section.
+
+## Title (76/80)
+```
+I will create animated Reels and Shorts for coaches who hate being on camera
+```
+
+## Tags (max 5, each max 20)
+`coach reels` | `faceless reels` | `animated shorts` | `explainer video` | `whiteboard animation`
+
+## Description (936/1200)
+```
+Want to post every week but hate being on camera? I turn your coaching ideas into short hand-drawn style animated videos for Reels, TikTok and YouTube Shorts.
+
+WHAT YOU GET
+- 1080x1920 vertical MP4, ready to upload
+- Big headlines, step-by-step reveals, before/after comparisons
+- Voice-over (natural AI voice, or your own recordings), soft music, word-by-word captions
+- A clear call to action on the last screen
+
+HOW IT WORKS
+1. Send me your tip or 3-5 bullet points (or just the topic: I can write the script for you to approve).
+2. I animate it and deliver.
+3. You get revisions as per the package.
+
+WHY COACHES ORDER
+Short videos that explain one idea keep people watching and make you the expert, without filming yourself. Need several a month? Take the 4 or 8 video package.
+
+HONEST NOTE: I use code-based animation templates and AI voices. Every script is made for your topic. No custom characters or logo animation (ask first).
+```
+
+## Packages
+| | Basic | Standard | Premium |
+|---|---|---|---|
+| Description (max 100) | 1 animated short, 15-20 s, AI voice, captions, music. 1 revision. | 4 animated shorts, 20-30 s each, voice, captions, music. 2 revisions each. | 8 animated shorts, 20-30 s, scripts written by me, voice, captions, music. |
+| Delivery | 3 days | 7 days | 14 days |
+| Revisions | 1 | 2 each | 2 each |
+| Price | $40 | $160 | $300 |
+| Per video | $40 | $40 | $37.50 |
+| You keep after 20% fee | $32 | $128 | $240 |
+
+Why these numbers (guesses): $40 is low enough to get a first order and review fast
+but not so low that it attracts the worst buyers. The bundles reward buyers who need
+content every week. Time check: with the template one short takes roughly 20-30
+minutes when the buyer supplies the points, longer with script writing. Raise prices
+after 3 reviews.
+
+## Extras
+- Script writing for the Basic package: +$15
+- Fast delivery (24 h): +$25
+- Extra 10 seconds: +$10
+
+## Buyer questions (requirements), unchanged from v1 plus
+7. What is your niche (e.g. stress, career, relationships) and who is your client?
+
+## Traction actions (do these WITH the gig, not after)
+1. Reply to every message within an hour.
+2. Send the gig link in the 5 lead messages (animation_leads.md), not just the sample.
+3. Ask the first 2 buyers for a review right after delivery.
+4. After 3 reviews: raise prices and widen the title back to a general explainer.
