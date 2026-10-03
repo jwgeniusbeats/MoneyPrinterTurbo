@@ -91,20 +91,26 @@ def _total_views(entry: dict) -> int:
     return total
 
 
-def _score(entry: dict) -> float:
-    """Prefer YouTube retention (% of video watched) over raw views: a much
-    stronger quality signal on a small channel where view counts are still
-    tiny and noisy. Falls back to YouTube views, then to summed views across
-    all platforms -- so a stretch where YouTube uploads are failing (account
-    block, quota, etc.) doesn't blind the whole learning loop even though
-    Facebook/Instagram/TikTok data keeps arriving fine."""
+MIN_VIEWS_FOR_RETENTION = 10
+
+
+def _score(entry: dict) -> tuple:
+    """Rank key as (tier, value) so values on different scales never compare.
+    Tier 2: YouTube retention (% watched), a stronger signal than raw views
+    on a small channel -- but only when the video has >= MIN_VIEWS_FOR_RETENTION
+    views, since a % from 3 views is noise. Tier 1: YouTube views. Tier 0:
+    summed views across all platforms, so a stretch where YouTube uploads fail
+    (account block, quota, etc.) doesn't blind the whole learning loop.
+    Comparing a retention % against a view count directly (the old behavior)
+    let e.g. 500 views outrank 255% watched."""
     yt = entry.get("platforms", {}).get("youtube", {})
     pct = yt.get("avg_view_percentage")
-    if pct:
-        return float(pct)
-    if yt.get("views") is not None:
-        return float(yt["views"])
-    return float(_total_views(entry))
+    views = yt.get("views")
+    if pct and (views or 0) >= MIN_VIEWS_FOR_RETENTION:
+        return (2, float(pct))
+    if views is not None:
+        return (1, float(views))
+    return (0, float(_total_views(entry)))
 
 
 def write_learnings(entries: list):
@@ -155,7 +161,7 @@ def write_learnings(entries: list):
     lines.append("Auto-generated from real YouTube view/retention data.")
     lines.append("Used as extra context when generating new video scripts.")
     lines.append("")
-    lines.append("## Top performing topics (ranked by YT watch-through %, falls back to YT views, then total cross-platform views)")
+    lines.append("## Top performing topics (ranked by YT watch-through % (10+ views), falls back to YT views, then total cross-platform views)")
     for e in top:
         lines.append(_fmt(e))
     if bottom:
