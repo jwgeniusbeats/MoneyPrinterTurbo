@@ -198,3 +198,100 @@ def upload_video_direct_post(
             raise RuntimeError(f"TikTok publish failed: {status_data.get('fail_reason')}")
 
     raise TimeoutError(f"TikTok publish status still pending after polling: {publish_id}")
+
+
+def has_scope(scope: str) -> bool:
+    """True if the stored token was granted `scope` (comma separated list kept
+    in tiktok_token.json by automation/tiktok_oauth_production.py)."""
+    try:
+        granted = (_load_token().get("scope") or "").split(",")
+    except (OSError, json.JSONDecodeError):
+        return False
+    return scope in [g.strip() for g in granted]
+
+
+def upload_video_to_inbox(video_path: str) -> dict:
+    """
+    Upload video_path to the creator's TikTok INBOX as a draft (scope
+    video.upload, endpoint /v2/post/publish/inbox/video/init/). The creator then
+    opens the TikTok app, gets a notification, adds the caption and taps Post.
+    There is no caption/title field on this endpoint.
+
+    Unlike Direct Post this route is not documented as needing an audit or as
+    being private-only (TikTok's docs list no such restriction for it). The
+    upload step itself is what counts as success here: after the PUT succeeds,
+    the status endpoint is polled a few times and only an explicit FAILED
+    raises. Returns {"publish_id": ..., "status": <last status or None>}.
+    """
+    if not os.path.exists(video_path):
+        raise FileNotFoundError(video_path)
+
+    access_token = _get_access_token()
+    video_size = os.path.getsize(video_path)
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json; charset=UTF-8",
+    }
+
+    init_resp = requests.post(
+        f"{API_BASE}/v2/post/publish/inbox/video/init/",
+        headers=headers,
+        json={
+            "source_info": {
+                "source": "FILE_UPLOAD",
+                "video_size": video_size,
+                "chunk_size": video_size,
+                "total_chunk_count": 1,
+            }
+        },
+        timeout=30,
+    )
+    if not init_resp.ok:
+        logger.error(f"TikTok inbox init failed {init_resp.status_code}: {init_resp.text}")
+    init_resp.raise_for_status()
+    init_data = init_resp.json()
+    if init_data.get("error", {}).get("code") not in (None, "ok"):
+        raise RuntimeError(f"TikTok inbox init error: {init_data['error']}")
+
+    publish_id = init_data["data"]["publish_id"]
+    upload_url = init_data["data"]["upload_url"]
+    logger.info(f"TikTok inbox upload initialized: {publish_id}")
+
+    with open(video_path, "rb") as f:
+        video_bytes = f.read()
+    upload_resp = requests.put(
+        upload_url,
+        headers={
+            "Content-Type": "video/mp4",
+            "Content-Length": str(video_size),
+            "Content-Range": f"bytes 0-{video_size - 1}/{video_size}",
+        },
+        data=video_bytes,
+        timeout=120,
+    )
+    if not upload_resp.ok:
+        logger.error(f"TikTok inbox upload failed {upload_resp.status_code}: {upload_resp.text}")
+    upload_resp.raise_for_status()
+    logger.info(f"TikTok inbox video bytes uploaded for {publish_id}")
+
+    status = None
+    for attempt in range(4):
+        time.sleep(5)
+        try:
+            status_resp = requests.post(
+                f"{API_BASE}/v2/post/publish/status/fetch/",
+                headers=headers,
+                json={"publish_id": publish_id},
+                timeout=30,
+            )
+            status_resp.raise_for_status()
+            status = status_resp.json().get("data", {}).get("status")
+        except (requests.RequestException, ValueError) as e:
+            logger.warning(f"TikTok inbox status check failed (non-fatal, upload itself succeeded): {e}")
+            continue
+        logger.info(f"TikTok inbox status ({attempt + 1}/4): {status}")
+        if status == "FAILED":
+            raise RuntimeError(f"TikTok inbox upload failed after upload: {publish_id}")
+        if status in ("SEND_TO_USER_INBOX", "PUBLISH_COMPLETE"):
+            break
+    return {"publish_id": publish_id, "status": status}

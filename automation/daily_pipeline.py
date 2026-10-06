@@ -26,6 +26,7 @@ sys.path.insert(0, BASE_DIR)
 
 from app.services import instagram_api, llm, meta_api, tiktok_api, youtube_api  # noqa: E402
 from app.utils import utils  # noqa: E402
+from automation.notify import notify_macos  # noqa: E402
 from automation.post_log_lock import locked_post_log  # noqa: E402
 
 try:
@@ -797,6 +798,7 @@ def main():
 
     state = load_state()
     manual_lines = []
+    tiktok_drafts_uploaded = 0
 
     for item in finished:
         subject = item["video_subject"]
@@ -912,30 +914,49 @@ def main():
             os.remove(meta_variant_path)
 
         tiktok_posted_directly = False
+        tiktok_inbox_draft = False
         if tiktok_api.production_ready():
-            # Audit has passed and the token was obtained against the
-            # Production app (see tiktok_api.production_ready()) -- post for
-            # real instead of queuing a manual reminder nobody was acting on
-            # anyway (0/54 queued videos ever got manually posted as of
-            # 2026-09-26).
-            try:
-                status = tiktok_api.upload_video_direct_post(
-                    video_path=labeled_path,
-                    title=description[:2200],
-                    privacy_level="PUBLIC_TO_EVERYONE",
-                )
-                post_ids = status.get("publicaly_available_post_id") or []
-                log_entry["platforms"]["tiktok"] = {
-                    "id": post_ids[0] if post_ids else None,
-                    "status": "live",
-                    "posted_at": datetime.now(timezone.utc).isoformat(),
-                }
-                print(f"TikTok posted directly: {post_ids[0] if post_ids else '(no id returned)'}")
-                tiktok_posted_directly = True
-            except Exception as e:
-                print(f"TikTok direct post failed for {subject}, falling back to manual queue: {e}")
+            # TIKTOK_MODE=inbox (default): upload as a draft into the TikTok app
+            # inbox (scope video.upload). Direct Post (TIKTOK_MODE=direct) is
+            # blocked for unaudited apps ("unaudited_client_can_only_post_to_
+            # private_accounts") and TikTok's audit rules do not cover private
+            # automation tools, so it is opt-in only.
+            mode = os.getenv("TIKTOK_MODE", "inbox").strip().lower()
+            if mode == "direct":
+                try:
+                    status = tiktok_api.upload_video_direct_post(
+                        video_path=labeled_path,
+                        title=description[:2200],
+                        privacy_level="PUBLIC_TO_EVERYONE",
+                    )
+                    post_ids = status.get("publicaly_available_post_id") or []
+                    log_entry["platforms"]["tiktok"] = {
+                        "id": post_ids[0] if post_ids else None,
+                        "status": "live",
+                        "posted_at": datetime.now(timezone.utc).isoformat(),
+                    }
+                    print(f"TikTok posted directly: {post_ids[0] if post_ids else '(no id returned)'}")
+                    tiktok_posted_directly = True
+                except Exception as e:
+                    print(f"TikTok direct post failed for {subject}, falling back to manual queue: {e}")
+            elif tiktok_api.has_scope("video.upload"):
+                try:
+                    up = tiktok_api.upload_video_to_inbox(labeled_path)
+                    log_entry["platforms"]["tiktok"] = {
+                        "status": "pending_manual",
+                        "inbox_draft": True,
+                        "publish_id": up.get("publish_id"),
+                    }
+                    print(f"TikTok draft uploaded to inbox: {up.get('publish_id')} (status {up.get('status')})")
+                    tiktok_inbox_draft = True
+                    tiktok_drafts_uploaded += 1
+                except Exception as e:
+                    print(f"TikTok inbox upload failed for {subject}, falling back to manual queue: {e}")
+            else:
+                print("TikTok token lacks scope video.upload: re-run automation/tiktok_oauth_production.py "
+                      "with --scopes user.info.basic,video.publish,video.upload. Using manual queue.")
 
-        if not tiktok_posted_directly:
+        if not tiktok_posted_directly and not tiktok_inbox_draft:
             log_entry["platforms"]["tiktok"] = {"status": "pending_manual"}
 
         # Append under lock against a freshly-read copy, not the in-memory
@@ -950,9 +971,14 @@ def main():
         # automatically -- carousels are never auto-posted regardless, so
         # this must not get silently dropped just because TikTok succeeded.
         carousel_slides = item.get("carousel_slides")
-        if not tiktok_posted_directly or carousel_slides:
+        if not tiktok_posted_directly or tiktok_inbox_draft or carousel_slides:
             manual_line = f"=== {title} ===\nFile: {labeled_path}\n"
-            if not tiktok_posted_directly:
+            if tiktok_inbox_draft:
+                manual_line += (
+                    "DRAFT IS ALREADY IN YOUR TIKTOK APP (inbox notification): open it, paste this caption, tap Post.\n"
+                    f"Caption:\n{description}\n"
+                )
+            elif not tiktok_posted_directly:
                 manual_line += (
                     f"Caption:\n{description}\n"
                     f"Suggested time: {slot_dt.isoformat()} (UTC) -> post manually on TikTok\n"
@@ -969,6 +995,13 @@ def main():
             f.write(f"\n--- Batch run {datetime.now(timezone.utc).isoformat()} ---\n")
             f.writelines(manual_lines)
         print(f"Manual TikTok reminders appended to {MANUAL_REMINDER_FILE}")
+
+    if tiktok_drafts_uploaded:
+        notify_macos(
+            "Nognize TikTok",
+            f"{tiktok_drafts_uploaded} concept(en) in je TikTok-app. Caption staat in manual_post_queue.txt.",
+            sound="Glass",
+        )
 
     try:
         # storage/tasks/ working folders (raw combined video, audio,
