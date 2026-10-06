@@ -77,6 +77,12 @@ def extract_code(pasted, expected_state):
         if state != expected_state:
             sys.exit("state does not match: this is not the response to the URL printed above. Aborting.")
         return params["code"][0]
+    if "://" in pasted or "/" in pasted:
+        sys.exit(
+            "That is a URL without '?code=...' in it, so it is not the response from TikTok.\n"
+            "Open the Authorize link printed above, press Authorize, and copy the address bar of the page\n"
+            "you land on AFTER that: it must contain code=... and state=..."
+        )
     return unquote(pasted)  # TikTok requires the code to be URL-decoded
 
 
@@ -85,6 +91,8 @@ def main():
     ap.add_argument("--redirect-uri", required=True, help="exactly as registered in the TikTok app")
     ap.add_argument("--scopes", default="user.info.basic,video.publish", help="comma separated, no spaces")
     a = ap.parse_args()
+    if not a.redirect_uri.startswith("https://") or "PLAK" in a.redirect_uri.upper():
+        sys.exit("--redirect-uri must be the real https:// URL only (no placeholder text in front of it).")
 
     app = load_app()
     state = pysecrets.token_urlsafe(16)
