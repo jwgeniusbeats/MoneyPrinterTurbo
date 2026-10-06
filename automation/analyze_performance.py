@@ -91,24 +91,62 @@ def _total_views(entry: dict) -> int:
     return total
 
 
-def _score(entry: dict) -> float:
-    """Prefer YouTube retention (% of video watched) over raw views: a much
-    stronger quality signal on a small channel where view counts are still
-    tiny and noisy. Falls back to YouTube views, then to summed views across
-    all platforms -- so a stretch where YouTube uploads are failing (account
-    block, quota, etc.) doesn't blind the whole learning loop even though
-    Facebook/Instagram/TikTok data keeps arriving fine."""
+MIN_VIEWS_FOR_RETENTION = 10
+
+
+def _score(entry: dict) -> tuple:
+    """Rank key as (tier, value) so values on different scales never compare.
+    Tier 2: YouTube retention (% watched), a stronger signal than raw views
+    on a small channel -- but only when the video has >= MIN_VIEWS_FOR_RETENTION
+    views, since a % from 3 views is noise. Tier 1: YouTube views. Tier 0:
+    summed views across all platforms, so a stretch where YouTube uploads fail
+    (account block, quota, etc.) doesn't blind the whole learning loop.
+    Comparing a retention % against a view count directly (the old behavior)
+    let e.g. 500 views outrank 255% watched."""
     yt = entry.get("platforms", {}).get("youtube", {})
     pct = yt.get("avg_view_percentage")
-    if pct:
-        return float(pct)
-    if yt.get("views") is not None:
-        return float(yt["views"])
-    return float(_total_views(entry))
+    views = yt.get("views")
+    if pct and (views or 0) >= MIN_VIEWS_FOR_RETENTION:
+        return (2, float(pct))
+    if views is not None:
+        return (1, float(views))
+    return (0, float(_total_views(entry)))
+
+
+MIN_AGE_DAYS_FOR_LEARNINGS = 3
+
+
+def _parse_ts(value):
+    if not value:
+        return None
+    try:
+        dt = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+
+
+def _is_mature(entry: dict) -> bool:
+    """True once the video had >= MIN_AGE_DAYS_FOR_LEARNINGS between going
+    public and its stats being fetched. Videos are uploaded scheduled for the
+    next morning and YouTube analytics lag 24-48h, so a stats pass run the
+    evening after posting records 0 views, and the video then lands in the
+    'Lowest performing -- avoid this angle' list for a reason that is only
+    timing. Compare against stats_fetched_at (not now), so an old video whose
+    stats were never refreshed late still counts as measured when fetched."""
+    yt = entry.get("platforms", {}).get("youtube", {})
+    live_at = (_parse_ts(yt.get("scheduled_for")) or _parse_ts(yt.get("posted_at"))
+               or _parse_ts(entry.get("posted_at")))
+    if live_at is None:
+        return True
+    fetched = _parse_ts(yt.get("stats_fetched_at")) or datetime.now(timezone.utc)
+    return (fetched - live_at).days >= MIN_AGE_DAYS_FOR_LEARNINGS
 
 
 def write_learnings(entries: list):
-    scored = [e for e in entries if _total_views(e) > 0 or e.get("platforms", {}).get("youtube", {}).get("views") is not None]
+    scored = [e for e in entries
+              if (_total_views(e) > 0 or e.get("platforms", {}).get("youtube", {}).get("views") is not None)
+              and _is_mature(e)]
     if len(scored) < MIN_VIDEOS_FOR_LEARNINGS:
         with open(LEARNINGS_FILE, "w") as f:
             f.write(
@@ -155,7 +193,7 @@ def write_learnings(entries: list):
     lines.append("Auto-generated from real YouTube view/retention data.")
     lines.append("Used as extra context when generating new video scripts.")
     lines.append("")
-    lines.append("## Top performing topics (ranked by YT watch-through %, falls back to YT views, then total cross-platform views)")
+    lines.append("## Top performing topics (ranked by YT watch-through % (10+ views), falls back to YT views, then total cross-platform views)")
     for e in top:
         lines.append(_fmt(e))
     if bottom:

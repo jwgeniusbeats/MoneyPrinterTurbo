@@ -400,7 +400,10 @@ def correct(subtitle_file, video_script, words: list | None = None):
         script_index += 1
         corrected = True
 
-    if corrected:
+    if corrected and not new_subtitle_items:
+        # Mirrors upstream e053af0: never replace a transcript with a cue-less file.
+        logger.warning("Subtitle correction produced no cues, keeping original")
+    elif corrected:
         with open(subtitle_file, "w", encoding="utf-8") as fd:
             for i, item in enumerate(new_subtitle_items):
                 fd.write(f"{i + 1}\n{item[1]}\n{item[2]}\n\n")

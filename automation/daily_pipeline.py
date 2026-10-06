@@ -916,12 +916,12 @@ def main():
         tiktok_posted_directly = False
         tiktok_inbox_draft = False
         if tiktok_api.production_ready():
-            # TIKTOK_MODE=inbox (default): upload as a draft into the TikTok app
+            # TIKTOK_MODE=queue (default): only write the queue entry. TIKTOK_MODE=inbox: upload as a draft into the TikTok app
             # inbox (scope video.upload). Direct Post (TIKTOK_MODE=direct) is
             # blocked for unaudited apps ("unaudited_client_can_only_post_to_
             # private_accounts") and TikTok's audit rules do not cover private
             # automation tools, so it is opt-in only.
-            mode = os.getenv("TIKTOK_MODE", "inbox").strip().lower()
+            mode = os.getenv("TIKTOK_MODE", "queue").strip().lower()
             if mode == "direct":
                 try:
                     status = tiktok_api.upload_video_direct_post(
@@ -939,7 +939,7 @@ def main():
                     tiktok_posted_directly = True
                 except Exception as e:
                     print(f"TikTok direct post failed for {subject}, falling back to manual queue: {e}")
-            elif tiktok_api.has_scope("video.upload"):
+            elif mode == "inbox" and tiktok_api.has_scope("video.upload"):
                 try:
                     up = tiktok_api.upload_video_to_inbox(labeled_path)
                     log_entry["platforms"]["tiktok"] = {
@@ -952,9 +952,11 @@ def main():
                     tiktok_drafts_uploaded += 1
                 except Exception as e:
                     print(f"TikTok inbox upload failed for {subject}, falling back to manual queue: {e}")
-            else:
+            elif mode == "inbox":
                 print("TikTok token lacks scope video.upload: re-run automation/tiktok_oauth_production.py "
                       "with --scopes user.info.basic,video.publish,video.upload. Using manual queue.")
+            # mode == "queue" (default): no API call. The entry goes to manual_post_queue.txt, where the
+            # tiktok-daily-post scheduled task (Claude in Chrome, TikTok Studio) picks it up.
 
         if not tiktok_posted_directly and not tiktok_inbox_draft:
             log_entry["platforms"]["tiktok"] = {"status": "pending_manual"}
@@ -977,6 +979,7 @@ def main():
                 manual_line += (
                     "DRAFT IS ALREADY IN YOUR TIKTOK APP (inbox notification): open it, paste this caption, tap Post.\n"
                     f"Caption:\n{description}\n"
+                    f"Suggested time: {slot_dt.isoformat()} (UTC) -> post manually on TikTok\n"
                 )
             elif not tiktok_posted_directly:
                 manual_line += (
