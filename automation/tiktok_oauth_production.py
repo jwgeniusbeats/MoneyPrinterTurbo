@@ -152,8 +152,11 @@ def main():
         info = {}
     levels = info.get("privacy_level_options")
     print("\nPrivacy levels offered by TikTok for this account:", levels)
+    print(f"Granted scopes: {token['scope']}")
+    print("The pipeline uploads drafts to your TikTok inbox by default (needs video.upload); you finish the post in the app.")
     if levels and "PUBLIC_TO_EVERYONE" in levels:
-        print("OK: public posting is allowed. daily_pipeline.py will now post directly.")
+        print("Note: TikTok lists PUBLIC_TO_EVERYONE, but unaudited apps can still be blocked at post time")
+        print("(error unaudited_client_can_only_post_to_private_accounts). Direct Post only works if TIKTOK_MODE=direct AND the audit passed.")
     else:
         print("WARNING: PUBLIC_TO_EVERYONE is NOT offered. Do not rely on public API posting yet.")
         print("Check in the TikTok developer portal that Content Posting API / Direct Post is approved for the production app.")
