@@ -44,7 +44,7 @@ MANUAL_REMINDER_FILE = os.path.join(BASE_DIR, "automation", "manual_post_queue.t
 POST_LOG_FILE = os.path.join(BASE_DIR, "automation", "post_log.json")
 LEARNINGS_FILE = os.path.join(BASE_DIR, "automation", "learnings.md")
 INSPIRATION_FILE = os.path.join(BASE_DIR, "automation", "content_inspiration.md")
-VIDEOS_PER_RUN = 4
+VIDEOS_PER_RUN = 3
 # Must match app.models.schema.VideoParams.video_script_prompt's
 # Field(max_length=...) exactly -- see run_batch() for why going over this
 # is a same-day full-batch outage, not a per-entry warning.
@@ -521,7 +521,7 @@ def run_batch(topics: list) -> list:
     return succeeded
 
 
-BACKLOG_REFILL_THRESHOLD = 8  # ~2 days of runway at VIDEOS_PER_RUN=4/day
+BACKLOG_REFILL_THRESHOLD = 8  # ~2.5 days of runway at VIDEOS_PER_RUN=3/day
 BACKLOG_REFILL_COUNT = 10
 SCRIPT_STYLE_SUFFIX = (
     " Keep the script short and punchy, about 80-100 words total, "
