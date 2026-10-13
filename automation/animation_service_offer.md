@@ -1,6 +1,17 @@
 # Animation Service: Hand-drawn-style explainer shorts (draft)
 
-Status: DRAFT, untested. No order has been placed for this offer yet.
+Status: PAUSED by the owner on 2026-10-13. Not cancelled because it failed, but
+because no free route to real buyers was found. Facts at the time of pausing:
+- Clip service: 5 free samples sent, no replies (stop rule hit).
+- Animation service: 0 samples sent. Reddit leads could not be fetched from the
+  cloud (reddit.com returns 403, search returns no Reddit results), the local
+  chat could not fetch them either, Upwork charges Connects (owner rule: no paid
+  steps) and the open Freelancer briefs found were closed or $10-15.
+- One real lead was found by the owner (Upwork, medical footwear explainer,
+  $500 fixed, 20-50 proposals). A 17 s sample was made but not sent.
+- The tooling (template, build_audio, render) works and stays in the repo.
+Restart only if the owner brings real leads or a free channel. Do not raise it
+again unprompted.
 Prices below are a launch guess meant to undercut the market while there are
 zero reviews. Raise them after the first 3 reviews.
 
