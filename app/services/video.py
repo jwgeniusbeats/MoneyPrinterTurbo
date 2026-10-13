@@ -1266,7 +1266,9 @@ def generate_video(
         params.font_size = int(params.font_size)
         params.stroke_width = int(params.stroke_width)
         phrase = subtitle_item[1]
-        max_width = video_width * 0.9
+        # 0.9 made sentence captions run nearly edge to edge on 9:16; a
+        # narrower block wraps to more lines but reads centered (user feedback).
+        max_width = video_width * 0.72
         bg_color = resolve_subtitle_background_color()
         rounded_bg_enabled = bool(
             getattr(params, "rounded_subtitle_background", False) and bg_color
@@ -1413,9 +1415,9 @@ def generate_video(
         if params.subtitle_position == "bottom":
             # 0.95 puts subtitles inside the safe-area TikTok/Reels/Shorts
             # reserve for their own share/caption UI (~12-15% of height) --
-            # 0.78 keeps them clear of it on 9:16 video with a bit more
-            # headroom than 0.83 (moved up slightly per user feedback).
-            _clip = _clip.with_position(("center", video_height * 0.78 - _clip.h))
+            # 0.76 keeps them clear of it on 9:16 video with a bit more
+            # headroom than 0.78/0.83 (moved up slightly per user feedback).
+            _clip = _clip.with_position(("center", video_height * 0.76 - _clip.h))
         elif params.subtitle_position == "top":
             _clip = _clip.with_position(("center", video_height * 0.05))
         elif params.subtitle_position in ("two_thirds_bottom", "two_thirds", "2/3_bottom"):
@@ -1783,6 +1785,20 @@ def _draw_title_card_image(
     return np.array(base) if transparent_bg else np.array(base.convert("RGB"))
 
 
+_CARD_HYPHENS = dict.fromkeys(map(ord, "‐‑‒–—"), "-")
+
+
+def _clean_card_text(text: str | None) -> str:
+    """The title-card fonts lack the non-breaking hyphen (U+2011) and emoji,
+    which rendered as an empty box (e.g. "ROLLER⊠COASTER") in the video."""
+    text = (text or "").translate(_CARD_HYPHENS)
+    text = "".join(
+        ch for ch in text
+        if not (0x1F000 <= ord(ch) <= 0x1FFFF or 0x2600 <= ord(ch) <= 0x27BF or ord(ch) in (0xFE0F, 0x200D))
+    )
+    return " ".join(text.split())
+
+
 def prepend_title_card(
     video_path: str,
     title_text: str,
@@ -1809,8 +1825,10 @@ def prepend_title_card(
     when available, so the opening segment shows real moving footage
     without the regular burned-in captions competing with the title card
     text on screen at the same time (the rest of the video, past
-    `duration`, keeps its normal captions untouched)."""
-    if not title_text or not title_text.strip():
+    `duration`, keeps its normal captions untouched). The pipeline no longer
+    passes it, so captions show from the first frame."""
+    title_text = _clean_card_text(title_text)
+    if not title_text:
         return False
 
     tmp_output = f"{video_path}.titlecard.mp4"

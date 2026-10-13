@@ -1633,18 +1633,8 @@ def _run_pipeline(
             title_text = title_metadata.get("title") or params.video_subject or ""
             card_duration = float(config.app.get("title_card_duration", 2.2))
             if title_text.strip():
-                for index, video_path in enumerate(final_video_paths):
-                    bg_source = (
-                        combined_video_paths[index]
-                        if index < len(combined_video_paths)
-                        else None
-                    )
-                    video.prepend_title_card(
-                        video_path,
-                        title_text,
-                        card_duration,
-                        bg_source,
-                    )
+                for video_path in final_video_paths:
+                    video.prepend_title_card(video_path, title_text, card_duration)
         except Exception as e:
             logger.warning(f"failed to generate title card: {e}")
 

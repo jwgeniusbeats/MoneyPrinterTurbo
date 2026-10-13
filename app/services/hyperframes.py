@@ -23,6 +23,7 @@ Drie soorten output:
 """
 
 import json
+import re
 import shutil
 import subprocess
 import time
@@ -47,6 +48,7 @@ DEFAULT_RENDER_TIMEOUT_SECONDS = 300.0
 MAIN_VIDEO_WIDTH = 1080
 MAIN_VIDEO_HEIGHT = 1920
 MAIN_VIDEO_FPS = 30
+CTA_LEAD_SILENCE_SECONDS = 0.3
 
 
 class HyperframesError(RuntimeError):
@@ -246,12 +248,53 @@ def render_bumper(
     )
 
 
+def _trim_point_before_trailing_silence(path: Path) -> float | None:
+    """Seconds at which to cut ``path`` so a short silent tail is dropped, or
+    None to keep it whole. The renderer pads the last clip slightly past the
+    end of the narration, which showed as a ~0.2 s flash of an unrelated
+    stock clip right before the end card. Only trims a tail of <=1 s, so a
+    mid-video pause can never cut real content."""
+    try:
+        probe = subprocess.run(
+            ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(path)],
+            capture_output=True, text=True, timeout=30,
+        )
+        duration = float(probe.stdout.strip())
+        scan = subprocess.run(
+            ["ffmpeg", "-hide_banner", "-nostats", "-i", str(path),
+             "-af", "silencedetect=noise=-45dB:d=0.08", "-f", "null", "-"],
+            capture_output=True, text=True, timeout=120,
+        )
+    except Exception:
+        return None
+    starts = [float(s) for s in re.findall(r"silence_start: ([0-9.]+)", scan.stderr)]
+    ends = [float(e) for e in re.findall(r"silence_end: ([0-9.]+)", scan.stderr)]
+    if not starts:
+        return None
+    ends += [duration] * (len(starts) - len(ends))  # a trailing silence has no end line
+    spans = list(zip(starts, ends))
+    if spans[-1][1] < duration - 0.05:
+        return None  # last silence ended before the file did: not a trailing one
+    # Noise can split one silent tail into several spans; walk back across gaps.
+    tail_start = spans[-1][0]
+    for start, end in reversed(spans[:-1]):
+        if end < tail_start - 0.15:
+            break
+        tail_start = start
+    cut = tail_start + 0.03
+    if duration - cut > 1.0 or cut < duration * 0.5 or cut >= duration:
+        return None
+    return cut
+
+
 def add_bumpers(
     main_video_path: str | Path,
     output_path: str | Path | None = None,
     brand: str = "Nognize",
     handle: str = "@nognize",
     cta: str | None = None,
+    cta_audio_path: str | Path | None = None,
+    cta_audio_seconds: float | None = None,
     project_dir: Path | None = None,
     timeout_seconds: float = DEFAULT_RENDER_TIMEOUT_SECONDS,
 ) -> Path:
@@ -260,9 +303,13 @@ def add_bumpers(
     ``main_video_path`` -- geen intro, de video begint gewoon zoals hij al
     begon. Re-encodeert beide segmenten naar een gemeenschappelijk formaat
     (1080x1920, 30fps, aac 44100 stereo) voor de concat, zodat een
-    audio/codec-mismatch tussen de stille outro en de narrated hoofdvideo de
+    audio/codec-mismatch tussen de outro en de narrated hoofdvideo de
     concat niet laat falen. Bij falen: raise HyperframesError, roeper
     (daily_pipeline.py) vangt dit af en gebruikt gewoon de originele video.
+
+    ``cta_audio_path`` (+ ``cta_audio_seconds``): gesproken follow-CTA die
+    tijdens de outro klinkt, zodat de kaart niet stil is. De outro wordt dan
+    zo lang als de spraak + 0,5 s; zonder audio blijft hij stil (1,8 s).
     """
     main_video_path = Path(main_video_path)
     if not main_video_path.exists():
@@ -270,8 +317,15 @@ def add_bumpers(
     if shutil.which("ffmpeg") is None:
         raise HyperframesError("ffmpeg niet gevonden op PATH.")
 
+    has_voice = bool(
+        cta_audio_path and Path(cta_audio_path).exists() and cta_audio_seconds
+    )
+    outro_seconds = (
+        max(1.8, float(cta_audio_seconds) + CTA_LEAD_SILENCE_SECONDS + 0.5) if has_voice else None
+    )
     outro = render_bumper(
-        "outro", brand=brand, handle=handle, cta=cta, project_dir=project_dir, timeout_seconds=timeout_seconds
+        "outro", brand=brand, handle=handle, cta=cta, duration=outro_seconds,
+        project_dir=project_dir, timeout_seconds=timeout_seconds,
     )
 
     output_path = Path(output_path) if output_path else main_video_path.with_name(
@@ -283,19 +337,39 @@ def add_bumpers(
     # hoofdvideo een andere audio sample rate/codec heeft dan de (stille)
     # outro. anullsrc levert de stille audiotrack voor de outro.
     w, h, fps = MAIN_VIDEO_WIDTH, MAIN_VIDEO_HEIGHT, MAIN_VIDEO_FPS
+    if has_voice:
+        # Gesproken CTA, opgevuld met stilte tot de outro-lengte (en daarop
+        # afgekapt) zodat audio en beeld van het outro-segment even lang zijn.
+        outro_audio_input = ["-i", str(cta_audio_path)]
+        outro_audio_filter = (
+            "[2:a]aformat=sample_rates=44100:channel_layouts=stereo,"
+            f"adelay={int(CTA_LEAD_SILENCE_SECONDS * 1000)}:all=1,"
+            f"apad,atrim=0:{outro.duration_seconds}[a1];"
+        )
+    else:
+        outro_audio_input = [
+            "-f", "lavfi", "-t", str(outro.duration_seconds),
+            "-i", "anullsrc=channel_layout=stereo:sample_rate=44100",
+        ]
+        outro_audio_filter = (
+            "[2:a]aformat=sample_rates=44100:channel_layouts=stereo[a1];"
+        )
+    main_cut = _trim_point_before_trailing_silence(main_video_path)
+    main_trim_args = ["-t", f"{main_cut:.3f}"] if main_cut else []
     command = [
         "ffmpeg",
         "-y",
+        *main_trim_args,
         "-i", str(main_video_path),              # 0: main video (has audio)
-        "-i", str(outro.output_path),            # 1: outro video (silent, no audio stream)
-        "-f", "lavfi", "-t", str(outro.duration_seconds),
-        "-i", "anullsrc=channel_layout=stereo:sample_rate=44100",  # 2: silence for outro
+        "-i", str(outro.output_path),            # 1: outro video (no audio stream)
+        *outro_audio_input,                      # 2: spoken CTA, or silence
         "-filter_complex",
         (
             f"[0:v]scale={w}:{h},setsar=1,fps={fps}[v0];"
             f"[1:v]scale={w}:{h},setsar=1,fps={fps}[v1];"
             "[0:a]aformat=sample_rates=44100:channel_layouts=stereo[a0];"
-            "[v0][a0][v1][2:a]concat=n=2:v=1:a=1[outv][outa]"
+            + outro_audio_filter
+            + "[v0][a0][v1][a1]concat=n=2:v=1:a=1[outv][outa]"
         ),
         "-map", "[outv]",
         "-map", "[outa]",

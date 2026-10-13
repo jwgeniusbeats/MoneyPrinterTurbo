@@ -18,6 +18,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import uuid
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
@@ -366,12 +367,50 @@ def _apply_hyperframes_bumpers(video_path: str, subject: str) -> str:
     """
     if hyperframes_service is None or not hyperframes_service.is_available():
         return video_path
+    cta_audio_path, cta_audio_seconds = _synthesize_outro_cta(subject)
     try:
-        bumpered = hyperframes_service.add_bumpers(video_path)
+        bumpered = hyperframes_service.add_bumpers(
+            video_path,
+            cta_audio_path=cta_audio_path,
+            cta_audio_seconds=cta_audio_seconds,
+        )
         return str(bumpered)
     except Exception as e:
         print(f"hyperframes bumper mislukt (non-fatal) voor {subject!r}: {e}")
         return video_path
+    finally:
+        if cta_audio_path and os.path.exists(cta_audio_path):
+            os.remove(cta_audio_path)
+
+
+OUTRO_CTA_SPOKEN = "Follow for more psychology facts."
+
+
+def _synthesize_outro_cta(subject: str) -> tuple[str | None, float | None]:
+    """Spreekt de follow-CTA in dezelfde Kokoro-stem als de rest van de video
+    (voice_for_topic is deterministisch per onderwerp), zodat de eindkaart niet
+    stil is. Bij elke fout (None, None): de outro blijft dan stil, zoals voorheen."""
+    path = os.path.join(tempfile.gettempdir(), f"outro_cta_{uuid.uuid4().hex[:8]}.mp3")
+    try:
+        from app.services import voice
+
+        voice.tts(
+            text=OUTRO_CTA_SPOKEN,
+            voice_name=f"kokoro:{voice_for_topic(subject)}",
+            voice_rate=1.0,
+            voice_file=path,
+        )
+        probe = subprocess.run(
+            ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", path],
+            capture_output=True, text=True, timeout=30,
+        )
+        seconds = float(probe.stdout.strip())
+        return path, seconds
+    except Exception as e:
+        print(f"outro-CTA spraak mislukt (outro blijft stil) voor {subject!r}: {e}")
+        if os.path.exists(path):
+            os.remove(path)
+        return None, None
 
 
 def _generate_hyperframes_carousel(subject: str, script: str) -> list[str] | None:
@@ -434,7 +473,7 @@ def run_batch(topics: list) -> list:
                 "bgm_type": "custom",
                 "bgm_file": bgm_for_voice(chosen_voice),
             }
-            script_prompt_parts = [FOLLOW_CTA_INSTRUCTION, SCRIPT_STYLE_SUFFIX.strip()]
+            script_prompt_parts = [CLOSING_TEASER_INSTRUCTION, SCRIPT_STYLE_SUFFIX.strip()]
 
             # A different random sample per topic (not the whole fixed list
             # every time) so a day's 4 videos don't all lean on the same one
@@ -523,23 +562,20 @@ def run_batch(topics: list) -> list:
 
 BACKLOG_REFILL_THRESHOLD = 8  # ~2.5 days of runway at VIDEOS_PER_RUN=3/day
 BACKLOG_REFILL_COUNT = 10
+# The spoken "Follow for more psychology facts." is added on the end card
+# (see _synthesize_outro_cta), so the script only needs a short teaser as its
+# last sentence: it plays over the footage with captions and leads into the
+# card instead of the card starting abruptly.
+CLOSING_TEASER_INSTRUCTION = (
+    "End the script with ONE short closing teaser sentence (8 words or fewer) "
+    "that makes the viewer want more, e.g. \"Your brain has plenty more "
+    "secrets.\" Do NOT ask the viewer to follow, subscribe, like or comment: "
+    "that is added separately."
+)
 SCRIPT_STYLE_SUFFIX = (
     " Keep the script short and punchy, about 80-100 words total, "
     "fast hook in the first sentence."
 )
-# A brand-new channel gets very little algorithmic push on YouTube/Instagram
-# (unlike TikTok's cold-start-friendly For You feed, which tests fresh
-# uploads regardless of follower count) -- an explicit spoken follow/subscribe
-# ask in the last line measurably improves follow-through, and no script
-# generated so far has included one at all.
-FOLLOW_CTA_INSTRUCTION = (
-    "End the script with a brief, natural spoken call-to-action to follow the "
-    "account for more psychology facts (e.g. \"Follow for more mind-bending "
-    "psychology facts\" or similar, in your own words matching the script's "
-    "tone) -- don't make it feel like an ad, keep it under 10 words, folded "
-    "naturally into the last sentence rather than tacked on."
-)
-
 
 # Curated from resources/tiktok-viral-hooks (shixinzhang/tiktok-viral-hooks,
 # MIT-licensed code / CC BY-NC-SA content) -- a hand-picked subset of its
