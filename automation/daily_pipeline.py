@@ -899,16 +899,25 @@ def main():
 
         save_state(state)
 
-        try:
+        if os.getenv("INSTAGRAM_MODE", "slot").strip().lower() == "slot":
             # Instagram's API has no native "schedule for later" (unlike
-            # YouTube/Facebook), so it publishes immediately at generation
-            # time rather than waiting for the 13:00/20:00 slot.
-            ig_result = instagram_api.upload_reel_via_url(video_path=meta_variant_path, caption=description)
-            print(f"Instagram published: {ig_result.get('id')}")
-            log_entry["platforms"]["instagram"] = {"id": ig_result.get("id"), "status": "live"}
-        except Exception as e:
-            print(f"Instagram upload failed for {subject}: {e}")
-            log_entry["platforms"]["instagram"] = {"status": "failed", "error": str(e)}
+            # YouTube/Facebook), so the post is parked here and published at the
+            # same slot as YouTube/Facebook by automation/instagram_slot_publisher.py
+            # (launchd, every 10 minutes). INSTAGRAM_MODE=immediate restores the
+            # old behaviour of publishing right now, in a burst with the others.
+            log_entry["platforms"]["instagram"] = {
+                "status": "pending_slot",
+                "scheduled_for": candidate_scheduled_utc,
+            }
+            print(f"Instagram parked for slot {candidate_scheduled_utc}")
+        else:
+            try:
+                ig_result = instagram_api.upload_reel_via_url(video_path=meta_variant_path, caption=description)
+                print(f"Instagram published: {ig_result.get('id')}")
+                log_entry["platforms"]["instagram"] = {"id": ig_result.get("id"), "status": "live"}
+            except Exception as e:
+                print(f"Instagram upload failed for {subject}: {e}")
+                log_entry["platforms"]["instagram"] = {"status": "failed", "error": str(e)}
 
         if meta_variant_path != video_path and os.path.exists(meta_variant_path):
             os.remove(meta_variant_path)
