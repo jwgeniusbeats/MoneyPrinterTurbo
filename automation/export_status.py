@@ -37,6 +37,7 @@ def thumbnail(video_path: str, width: int = 150) -> str:
 
 def build_feed(post_log: list) -> dict:
     items = []
+    data_as_of = ""
     totals = {k: {"views": 0, "likes": 0, "comments": 0, "videos": 0, "live": 0} for k in KEYS}
     for e in post_log:
         p = {}
@@ -44,6 +45,7 @@ def build_feed(post_log: list) -> dict:
             if name not in KEYS:
                 continue
             status = v.get("status")
+            data_as_of = max(data_as_of, (v.get("stats_fetched_at") or "")[:10])
             p[KEYS[name]] = [STAT.get(status, "x"), v.get("views") or 0, v.get("likes") or 0, v.get("comments") or 0]
             t = totals[name]
             t["videos"] += 1
@@ -60,7 +62,7 @@ def build_feed(post_log: list) -> dict:
         it.pop("_v", None)
         if not it.get("img"):
             it.pop("img", None)
-    return {"asOf": datetime.now(timezone.utc).isoformat(timespec="seconds"), "platforms": totals, "items": items}
+    return {"asOf": datetime.now(timezone.utc).isoformat(timespec="seconds"), "dataAsOf": data_as_of, "platforms": totals, "items": items}
 
 
 def _git(*args, input=None):
