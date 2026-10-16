@@ -45,7 +45,14 @@ def sync_youtube(post_log):
         found_ids = {item["id"] for item in resp.get("items", [])}
         for item in resp.get("items", []):
             st = item["status"]
-            real_status[item["id"]] = "live" if st.get("privacyStatus") == "public" else st.get("privacyStatus")
+            # A video uploaded with a future publishAt reports privacyStatus
+            # "private" until that time; that is "scheduled", not private.
+            if st.get("privacyStatus") == "public":
+                real_status[item["id"]] = "live"
+            elif st.get("privacyStatus") == "private" and st.get("publishAt"):
+                real_status[item["id"]] = "scheduled"
+            else:
+                real_status[item["id"]] = st.get("privacyStatus")
         for missing_id in set(batch) - found_ids:
             real_status[missing_id] = "missing"  # deleted or otherwise gone
 
@@ -82,7 +89,15 @@ def sync_facebook(post_log):
             timeout=30,
         ).json()
         if "error" in resp:
-            real_status[vid] = "missing"  # deleted or inaccessible
+            # Only a "object does not exist" error means the video is gone.
+            # Token expiry (190), rate limits (4/17/32/613) or 5xx errors say
+            # nothing about the video: marking those "missing" would flip
+            # every Facebook entry at once when the token lapses.
+            err = resp["error"]
+            if err.get("code") == 803 or (err.get("code") == 100 and err.get("error_subcode") == 33):
+                real_status[vid] = "missing"  # deleted or inaccessible
+            else:
+                print(f"Facebook {vid}: API error {err.get('code')} ({err.get('message', '')[:80]}), status left unchanged.")
             continue
         publish_status = resp.get("status", {}).get("publishing_phase", {}).get("publish_status")
         real_status[vid] = "live" if publish_status == "published" else "scheduled" if publish_status == "scheduled" else publish_status
