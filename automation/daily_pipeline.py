@@ -523,9 +523,17 @@ def run_batch(topics: list) -> list:
 
 BACKLOG_REFILL_THRESHOLD = 8  # ~2 days of runway at VIDEOS_PER_RUN=4/day
 BACKLOG_REFILL_COUNT = 10
+# Retention on YouTube averages ~29% of the video (see learnings), so most
+# viewers leave early. The old suffix only asked for "a fast hook", which the
+# model satisfied with generic openers ("Did you know...", "Have you ever
+# wondered..."). This spells out what the first sentence must do instead.
 SCRIPT_STYLE_SUFFIX = (
-    " Keep the script short and punchy, about 80-100 words total, "
-    "fast hook in the first sentence."
+    " Write 70-90 words. The first sentence decides everything: at most 12 words, "
+    "a concrete, specific claim or tension about the viewer's own life, with no "
+    "greeting and no 'did you know', 'have you ever wondered' or 'in this video'. "
+    "Open a loop in the first two sentences and pay it off in the last third. "
+    "Keep sentences under 14 words, one idea each, no filler. "
+    "Where it fits, let the final sentence echo the opening line."
 )
 # A brand-new channel gets very little algorithmic push on YouTube/Instagram
 # (unlike TikTok's cold-start-friendly For You feed, which tests fresh
@@ -828,6 +836,9 @@ def main():
         category, hook_type = classify_video(subject, title)
         log_entry["category"] = category
         log_entry["hook_type"] = hook_type
+        # First sentence of the script, so later analysis can compare actual
+        # openers against retention instead of only the title-based hook_type.
+        log_entry["opening_line"] = (script or "").strip().split(". ")[0][:160]
         caption = meta.get("caption") or script
         hashtags_list = meta.get("hashtags") or []
         hashtags = " ".join(hashtags_list)
