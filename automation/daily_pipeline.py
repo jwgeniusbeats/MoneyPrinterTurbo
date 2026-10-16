@@ -1029,6 +1029,14 @@ def main():
     except Exception as e:
         print(f"Storage cleanup failed (non-fatal): {e}")
 
+    try:
+        # Sanitised status feed (no captions/paths/tokens) pushed to the
+        # `status-feed` branch for the Agent Kantoor dashboard. Never fatal.
+        from automation.export_status import export_and_push
+        export_and_push()
+    except Exception as e:
+        print(f"Status feed export failed (non-fatal): {e}")
+
 
 if __name__ == "__main__":
     main()
