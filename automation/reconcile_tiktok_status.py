@@ -13,9 +13,7 @@ Let op: update_tiktok_stats.py koppelt op VOLGORDE aan alle "live" entries. Vide
 zijn gepost zonder regel in tiktok_posted.log blijven hier "pending_manual" en worden dus niet geteld.
 """
 import argparse
-import json
 import os
-import re
 import sys
 from datetime import datetime, timezone
 

@@ -12,6 +12,7 @@ import subprocess
 import sys
 import tempfile
 from datetime import datetime, timezone
+from typing import Optional
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if BASE_DIR not in sys.path:
@@ -81,7 +82,7 @@ def collect_channel() -> dict:
     return channel
 
 
-def build_feed(post_log: list, channel: dict | None = None) -> dict:
+def build_feed(post_log: list, channel: Optional[dict] = None) -> dict:
     items = []
     data_as_of = ""
     totals = {k: {"views": 0, "likes": 0, "comments": 0, "videos": 0, "live": 0} for k in KEYS}
