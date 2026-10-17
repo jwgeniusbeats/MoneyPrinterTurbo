@@ -76,3 +76,6 @@ graphify-out/
 
 # HyperFrames render output (bumpers/carousels), regenerated every daily run.
 hyperframes_project/out/
+
+# Timestamped safety copies written by update_tiktok_stats.py --apply
+automation/post_log.backup-*.json

@@ -1,0 +1,24 @@
+---
+name: scrape-tiktok-stats
+description: Scrapes view counts from TikTok Studio's content list into post_log.json, feeding the performance learning loop
+---
+
+Use the claude-in-chrome browser tools to scrape current TikTok view/like/comment counts AND follower count, feeding them into the Nognize performance-tracking and monetization-tracking systems. Use absolute paths throughout — do NOT call change_directory (this is an unattended run; change_directory would hang waiting for a folder-trust approval nobody can grant).
+
+IMPORTANT: this task is in CONTROL MODE. Step 5 runs update_tiktok_stats.py as a DRY RUN only (no --apply). It must not write post_log.json.
+
+Steps:
+1. Load claude-in-chrome tools if deferred: ToolSearch "select:mcp__claude-in-chrome__tabs_context_mcp,mcp__claude-in-chrome__navigate,mcp__claude-in-chrome__get_page_text,mcp__claude-in-chrome__computer,mcp__claude-in-chrome__tabs_close_mcp".
+2. tabs_context_mcp — check if a tab already has tiktok.com open (there usually is, already logged in as Nognize). If so reuse it; otherwise navigate a tab to https://www.tiktok.com/tiktokstudio/content (createIfEmpty:true on tabs_context_mcp first if no tab group exists). **If you had to create a new tab** (none existed), close it with tabs_close_mcp at the very end of this run (after step 7), regardless of outcome -- don't leave throwaway tabs open to accumulate across runs. Never close a tab you didn't create yourself.
+3. Collect ALL rows of TikTok Studio's content list. The page header shows "Berichten N" (N = total number of posts): that N is the number of rows you must reach. The list is lazy-loaded/virtualized: get_page_text only returns the rows currently rendered (the first load shows only ~8), so you must scroll:
+   a. Call get_page_text. Each row is: duration (mm:ss), the caption text, the date ("16 okt, 20:05"), privacy ("Iedereen"/"Alleen ik"), then three numbers (views, likes, comments). Append the rows to a master list in the order the page lists them. For every row keep BOTH the caption (first 150 characters, exactly as shown) and the date string exactly as shown. A row still "Content wordt beoordeeld" / in moderation with no numbers: keep it with views/likes/comments = null.
+   b. Scroll the list down with the `computer` tool (action "scroll" over the middle of the content list, scroll_amount 3), wait ~2 seconds, call get_page_text again. Small steps matter: big jumps skip rows that were never rendered.
+   c. Merge snapshots by OVERLAP: find where the first rows of the new snapshot repeat the last rows already in the master list (same duration + caption + date + numbers) and append only the rows after that overlap. If a snapshot has NO overlap with the master list's tail, you scrolled too far: scroll back up one step and use a smaller step. Never append a snapshot without a confirmed overlap. Never invent, estimate or copy a row from a screenshot: only rows that appeared in get_page_text output may go into the list.
+   d. Repeat b-c until the master list has N rows, or until 3 consecutive scrolls add no new rows, or after 40 scroll steps.
+   Do not use javascript_tool to read or change the page.
+4. Write the master list as a JSON array of objects {"caption": "...", "date": "16 okt, 20:05", "views": N, "likes": N, "comments": N} (same order as the page) to your own scratchpad directory (NOT the project dir) as tiktok_rows.json.
+5. Run: `uv run python /Users/geniusbeats/MoneyPrinterTurbo/automation/update_tiktok_stats.py <path to your tiktok_rows.json>` with working directory /Users/geniusbeats/MoneyPrinterTurbo. WITHOUT --apply. The script matches each row to a post_log entry by caption and date (never by position) and prints per video what it WOULD write, or why it skips the row.
+6. Final report: (a) rows scraped vs N, (b) the complete output of the script quoted verbatim (every line, including the per-video lines and the summary), (c) any problem you saw. Do not summarise the script output away. If the tab isn't logged into TikTok or the layout differs from expected, report what you saw and stop.
+7. Now navigate that same tab to https://www.tiktok.com/@nognize and call get_page_text again. Near the top it shows follower/following/likes counts (Dutch labels: "Volgend", "Volgers", "Likes" -- each preceded by a number). Extract the "Volgers" (followers) number. Write a JSON file at /Users/geniusbeats/MoneyPrinterTurbo/automation/tiktok_followers.json shaped like {"followers": N, "updated_at": "<ISO 8601 UTC timestamp of now>"} -- write it directly (small, safe local file). This feeds the TikTok section of automation/monetization_tracker.py.
+
+This is read-only scraping (no posting, no clicking anything that changes state — scrolling is fine). Don't post, edit, or delete anything on TikTok. Do not edit post_log.json.
