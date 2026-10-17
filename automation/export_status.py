@@ -14,8 +14,17 @@ import tempfile
 from datetime import datetime, timezone
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if BASE_DIR not in sys.path:
+    sys.path.insert(0, BASE_DIR)  # nodig als dit script los wordt gestart (python3 automation/export_status.py)
 POST_LOG_FILE = os.path.join(BASE_DIR, "automation", "post_log.json")
 OUT_FILE = os.path.join(BASE_DIR, "automation", "public_status.json")
+TIKTOK_FOLLOWERS_FILE = os.path.join(BASE_DIR, "automation", "tiktok_followers.json")
+# Vaste identiteit voor de feed-commits, zodat ze niet de git-identiteit van de Mac dragen.
+# Dit is alleen een label: het maakt een commit niet "Verified" (daar is een handtekening voor nodig).
+FEED_COMMIT_ENV = {
+    "GIT_AUTHOR_NAME": "Claude", "GIT_AUTHOR_EMAIL": "noreply@anthropic.com",
+    "GIT_COMMITTER_NAME": "Claude", "GIT_COMMITTER_EMAIL": "noreply@anthropic.com",
+}
 KEYS = {"youtube": "y", "tiktok": "t", "instagram": "i", "facebook": "f"}
 STAT = {"live": "l", "scheduled": "s", "pending_manual": "p", "private": "v"}
 
@@ -35,7 +44,44 @@ def thumbnail(video_path: str, width: int = 150) -> str:
         return ""
 
 
-def build_feed(post_log: list) -> dict:
+def collect_channel() -> dict:
+    """Kanaalcijfers die echt uit een bron komen. Wat ontbreekt of faalt wordt weggelaten, nooit geschat.
+
+    YouTube: abonnees en kijkuren (365 d) uit de YouTube API (alleen als het token aanwezig is).
+    TikTok: volgers uit tiktok_followers.json, met het tijdstip van die meting (kan oud zijn).
+    Geen tokens, kanaal-id's of paden.
+    """
+    channel = {}
+    yt = {}
+    try:
+        from app.services import youtube_api
+        stats = youtube_api.get_channel_stats()
+        if stats.get("subscriberCount") is not None:
+            yt["subscribers"] = int(stats["subscriberCount"])
+        try:
+            yt["watchHours365"] = round(float(youtube_api.get_watch_minutes(365)) / 60, 1)
+        except Exception:
+            pass
+    except Exception:
+        pass
+    if yt:
+        channel["youtube"] = yt
+    try:
+        with open(TIKTOK_FOLLOWERS_FILE) as f:
+            data = json.load(f)
+        if data.get("followers") is not None:
+            tt = {"followers": int(data["followers"])}
+            if data.get("updated_at"):
+                tt["asOf"] = str(data["updated_at"])
+            channel["tiktok"] = tt
+    except Exception:
+        pass
+    if channel:
+        channel["asOf"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    return channel
+
+
+def build_feed(post_log: list, channel: dict | None = None) -> dict:
     items = []
     data_as_of = ""
     totals = {k: {"views": 0, "likes": 0, "comments": 0, "videos": 0, "live": 0} for k in KEYS}
@@ -62,25 +108,30 @@ def build_feed(post_log: list) -> dict:
         it.pop("_v", None)
         if not it.get("img"):
             it.pop("img", None)
-    return {"asOf": datetime.now(timezone.utc).isoformat(timespec="seconds"), "dataAsOf": data_as_of, "platforms": totals, "items": items}
+    feed = {"asOf": datetime.now(timezone.utc).isoformat(timespec="seconds"), "dataAsOf": data_as_of, "platforms": totals, "items": items}
+    if channel:
+        feed["channel"] = channel
+    return feed
 
 
-def _git(*args, input=None):
-    return subprocess.run(["git", "-C", BASE_DIR, *args], input=input, capture_output=True, text=True, check=True).stdout.strip()
+def _git(*args, input=None, env=None):
+    return subprocess.run(["git", "-C", BASE_DIR, *args], input=input, capture_output=True, text=True, check=True,
+                          env=env).stdout.strip()
 
 
 def push_feed(path: str, remote: str = "origin", branch: str = "status-feed"):
     """Plumbing: blob -> tree -> commit zonder ouder -> force-push. Raakt werkmap en index niet."""
     blob = _git("hash-object", "-w", path)
     tree = _git("mktree", input=f"100644 blob {blob}\tpublic_status.json\n")
-    commit = _git("commit-tree", tree, "-m", f"status feed {datetime.now(timezone.utc).isoformat(timespec='seconds')}")
+    commit = _git("commit-tree", tree, "-m", f"status feed {datetime.now(timezone.utc).isoformat(timespec='seconds')}",
+                  env={**os.environ, **FEED_COMMIT_ENV})
     _git("push", "--force", remote, f"{commit}:refs/heads/{branch}")
 
 
 def export_and_push(remote: str = "origin"):
     try:
         with open(POST_LOG_FILE) as f:
-            feed = build_feed(json.load(f))
+            feed = build_feed(json.load(f), collect_channel())
         tmp = OUT_FILE + ".tmp"
         with open(tmp, "w") as f:
             json.dump(feed, f, ensure_ascii=False, separators=(",", ":"))
