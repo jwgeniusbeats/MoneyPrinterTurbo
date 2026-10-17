@@ -73,3 +73,6 @@ automation/portfolio_projects/
 # graphify's generated knowledge-graph output -- regenerated weekly by the
 # graphify-weekly-update task, not worth committing every week.
 graphify-out/
+
+automation/public_status.json
+automation/public_status.json.tmp
