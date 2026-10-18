@@ -10,7 +10,7 @@ Orion uses funding rate and open interest instead of news (no free news feed); s
 
 ## Try it
 ```
-python3 automation/paper_desk/test_paper_desk.py     # offline checks of the accounting
+python3 automation/paper_desk/selfcheck.py     # offline checks of the accounting
 python3 -m automation.paper_desk.desk check          # needs network: fetches facts, writes nothing
 DESK_STUB=1 python3 -m automation.paper_desk.desk run --force   # one cycle without model calls
 python3 -m automation.paper_desk.score               # table + honest verdict
