@@ -398,11 +398,16 @@ def _generate_hyperframes_carousel(subject: str, script: str) -> list[str] | Non
         return None
 
 
-def run_batch(topics: list) -> list:
+def run_batch(topics: list, stop_at: str = "video") -> list:
+    """stop_at="script" is the dry-run: cli.py stops after script generation,
+    so nothing is rendered and the caller never reaches an upload step."""
     import random
 
     learnings = load_learnings()
     batch_path = os.path.join(BASE_DIR, "automation", "_run_batch.jsonl")
+    if stop_at != "video":
+        # Keep dry runs from touching the tracked scratch file a real run writes.
+        batch_path = os.path.join(tempfile.gettempdir(), "_dry_run_batch.jsonl")
     subtitle_modes = []  # parallel to `topics`, so succeeded[] can log which mode each video got
     with open(batch_path, "w") as f:
         for topic in topics:
@@ -477,8 +482,11 @@ def run_batch(topics: list) -> list:
             )
             f.write(json.dumps(entry) + "\n")
 
+    cmd = ["uv", "run", "python", "cli.py", "--batch-file", batch_path]
+    if stop_at != "video":
+        cmd += ["--stop-at", stop_at]
     result = subprocess.run(
-        ["uv", "run", "python", "cli.py", "--batch-file", batch_path],
+        cmd,
         cwd=BASE_DIR,
         capture_output=True,
         text=True,
@@ -504,6 +512,15 @@ def run_batch(topics: list) -> list:
         if task.get("status") == "succeeded":
             r = task["result"]
             subject = topics[task["index"] - 1]
+            if stop_at == "script":
+                succeeded.append(
+                    {
+                        "topic_index": task["index"] - 1,
+                        "video_subject": subject,
+                        "script": r.get("script") or "",
+                    }
+                )
+                continue
             final_video = _apply_hyperframes_bumpers(r["videos"][0], subject)
             carousel_slides = _generate_hyperframes_carousel(subject, r["script"])
             succeeded.append(
@@ -766,7 +783,28 @@ def retry_failed_platforms(post_log: list):
                     entry.setdefault("platforms", {}).update(updates)
 
 
+def dry_run():
+    """Generate this run's scripts and print them. Writes nothing and uploads
+    nothing: the backlog, schedule state, post log and platforms are untouched,
+    and retry_failed_platforms() (which re-uploads) is never called."""
+    backlog = load_backlog()
+    if not backlog:
+        print("Topic backlog empty, nothing to do.")
+        return
+    topics = backlog[:VIDEOS_PER_RUN]
+    print(f"DRY RUN: generating {len(topics)} scripts, nothing will be uploaded or saved.\n")
+    for item in run_batch(topics, stop_at="script"):
+        script = item["script"].strip()
+        opening = script.split(". ")[0]
+        print(f"--- {item['video_subject']}")
+        print(f"opening ({len(opening.split())} words): {opening}")
+        print(f"script ({len(script.split())} words):\n{script}\n")
+
+
 def main():
+    if "--dry-run" in sys.argv[1:]:
+        dry_run()
+        return
     post_log = load_post_log()
     retry_failed_platforms(post_log)
 
