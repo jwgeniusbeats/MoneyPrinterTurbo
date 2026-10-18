@@ -678,6 +678,11 @@ def generate_new_topics(n: int, learnings: str, existing: list, inspiration: str
     from app.services import llm as _llm
 
     response = _llm._generate_response(prompt=prompt)
+    # _generate_response reports failures (rate limit, auth) as an "Error: ..."
+    # string instead of raising. Without this check the error text became a
+    # backlog topic and was posted as a video subject/SEO tag (2026-10-18).
+    if response.strip().startswith("Error"):
+        raise RuntimeError(f"topic generation LLM call failed: {response.strip()[:200]}")
     lines = [ln.strip("-* \t") for ln in response.strip().splitlines() if ln.strip()]
     # Stored as plain topics -- SCRIPT_STYLE_SUFFIX is appended only at the
     # point of generation (run_batch), not baked into the topic's identity,
