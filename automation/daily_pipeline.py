@@ -1039,6 +1039,15 @@ def main():
         print(f"Storage cleanup failed (non-fatal): {e}")
 
     try:
+        # Fresh YouTube/Instagram/Facebook numbers (and learnings.md) before the feed is built, so the
+        # feed's "dataAsOf" is today instead of the last manual analysis run. Once a day on purpose:
+        # Instagram insights cost one API call per video. Never fatal.
+        from automation.analyze_performance import main as refresh_platform_stats
+        refresh_platform_stats()
+    except Exception as e:
+        print(f"Platform stats refresh failed (non-fatal): {e}")
+
+    try:
         # Sanitised status feed (no captions/paths/tokens) pushed to the
         # `status-feed` branch for the Agent Kantoor dashboard. Never fatal.
         from automation.export_status import export_and_push
