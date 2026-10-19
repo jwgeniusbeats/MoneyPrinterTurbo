@@ -8,6 +8,7 @@ Needs a free YouTube Data API v3 key (Google Cloud console). Quota: each search 
     export YT_API_KEY=...
     python3 automation/lead_finder/yt_leads.py                      # default niches, English
     python3 automation/lead_finder/yt_leads.py --lang nl --days 14  # Dutch-language niches
+    python3 automation/lead_finder/yt_leads.py --lang all           # English and Dutch niches, any language
     python3 automation/lead_finder/yt_leads.py --queries my_queries.txt --top 30
 
 Output: leads.csv and leads.md next to this file (not committed). Contact details are only what the channel
@@ -143,8 +144,13 @@ def main(argv=None):
     key = os.environ.get("YT_API_KEY")
     if not key:
         print("Set YT_API_KEY first (see the docstring)."); return 2
-    queries = [l.strip() for l in open(a.queries) if l.strip()] if a.queries else DEFAULT_QUERIES.get(a.lang, DEFAULT_QUERIES["en"])
-    leads, n = run(lambda p, q: http_api(p, q, key), queries, a.days, a.top, a.lang, a.min_subs, a.max_subs)
+    if a.queries:
+        queries = [l.strip() for l in open(a.queries) if l.strip()]
+    elif a.lang == "all":
+        queries = DEFAULT_QUERIES["en"] + DEFAULT_QUERIES["nl"]
+    else:
+        queries = DEFAULT_QUERIES.get(a.lang, DEFAULT_QUERIES["en"])
+    leads, n = run(lambda p, q: http_api(p, q, key), queries, a.days, a.top, None if a.lang == "all" else a.lang, a.min_subs, a.max_subs)
     write(leads); print(f"{n} channels checked, {len(leads)} fit. Files: {HERE}/leads.csv and leads.md")
     return 0
 
