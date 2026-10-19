@@ -76,3 +76,6 @@ graphify-out/
 
 automation/public_status.json
 automation/public_status.json.tmp
+
+automation/lead_finder/leads.csv
+automation/lead_finder/leads.md
