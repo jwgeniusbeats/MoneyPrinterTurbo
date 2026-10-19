@@ -177,18 +177,24 @@ def build_seo_tags(
     YouTube's own systems, working against the reason the compilation
     exists at all."""
     tags = [h.lstrip("#") for h in hashtags if h.lstrip("#")]
-    tags.append(subject[:100])
-    tags.append(title[:100])
+    tags.append(subject)
+    tags.append(title)
     if category and category != "general":
         tags.append(category.replace("_", " "))
     tags.extend(["psychology facts", "mind facts", "psychology"])
     if is_short:
         tags.append("shorts")
 
+    # Subject/title are full sentences (often truncated mid-word at 100 chars,
+    # or an "Error: ..." string if an LLM call failed upstream) -- not search
+    # phrases. YouTube ignores tags over ~30 chars, and 105 of 136 logged
+    # entries had one wasting a slot, so keep only short, non-error tags.
     seen = set()
     deduped = []
     for t in tags:
         key = t.lower().strip()
+        if len(key) > 30 or key.startswith("error"):
+            continue
         if key and key not in seen:
             seen.add(key)
             deduped.append(t.strip())
