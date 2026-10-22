@@ -24,6 +24,11 @@ from zoneinfo import ZoneInfo
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, BASE_DIR)
 
+if __name__ == "__main__":
+    # Haal eerst de nieuwste levering binnen (en start dan opnieuw) voordat de rest wordt geimporteerd.
+    from automation.self_update import update_and_reexec
+    update_and_reexec()
+
 from app.services import instagram_api, llm, meta_api, tiktok_api, youtube_api  # noqa: E402
 from app.utils import utils  # noqa: E402
 from automation.notify import notify_macos  # noqa: E402
@@ -938,6 +943,9 @@ def main():
         meta_variant_path = create_meta_variant(video_path) if (facebook_on or instagram_now) else video_path
 
         if not facebook_on:
+            # Het slot is bezet door Instagram/YouTube; zonder Facebook moet de slotteller hier zelf doorschuiven,
+            # anders krijgen video's na een YouTube-fout hetzelfde slot.
+            state["last_scheduled_utc"] = candidate_scheduled_utc
             log_entry["platforms"]["facebook"] = {"status": "disabled"}
         else:
             try:

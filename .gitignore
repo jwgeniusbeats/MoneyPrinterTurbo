@@ -82,3 +82,5 @@ automation/experiment_state.json
 automation/experiment_state.json.tmp
 automation/experiment_report.md
 automation/blocked_videos.log
+
+automation/self_update.log
