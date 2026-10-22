@@ -812,6 +812,25 @@ def main():
         subject = item["video_subject"]
         script = item["script"]
         video_path = item["final_video"]
+
+        # Niets uploaden waarvan het einde is afgekapt (bv. "...follow for more quick"). De controle kijkt naar
+        # het resultaat (stem tegenover eindvideo), faalt zelf nooit hard en staat uit met TAIL_CHECK=off.
+        try:
+            from automation.video_tail_check import verify_task_video
+            tail_ok, tail_problems, tail_metrics = verify_task_video(item["task_id"], video_path)
+        except Exception as e:
+            tail_ok, tail_problems, tail_metrics = True, [f"tail check mislukt: {e}"], {}
+        print(f"Tail check {subject!r}: ok={tail_ok} {tail_metrics} {tail_problems}")
+        if not tail_ok:
+            try:
+                with open(os.path.join(BASE_DIR, "automation", "blocked_videos.log"), "a") as bf:
+                    bf.write(f"{datetime.now(timezone.utc).isoformat()} | {item['task_id']} | {subject!r} | "
+                             f"{tail_problems} | {video_path}\n")
+            except OSError:
+                pass
+            notify_macos("Nognize", f"Video niet geüpload: einde afgekapt ({subject[:40]})", sound="Basso")
+            continue
+
         log_entry = {
             "task_id": item["task_id"],
             "subject": subject,
