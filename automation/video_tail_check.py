@@ -99,7 +99,6 @@ def main():
         voice = os.path.join(d, "audio.mp3")
         if not finals or not os.path.exists(voice):
             continue
-        ok, problems, m = check_tail(voice, finals[0])
         words = None
         try:
             import json
@@ -107,11 +106,14 @@ def main():
                 words = len((json.load(f).get("script") or "").split())
         except Exception:
             pass
-        print("%s  %s  T=%s A=%s V=%s eind=%s woorden=%s" % (
-            "OK  " if ok else "FOUT", os.path.basename(d)[:8], _fmt(m["T"]), _fmt(m["A"]), _fmt(m["V"]),
-            _fmt(m["E"], "dB"), words if words is not None else "n/a"))
-        for p in problems:
-            print("       - " + p)
+        # Alle eindbestanden van de taak: final-1.mp4 (voor de outro) en final-1_bumpered.mp4 (wat wordt geüpload).
+        for fin in finals:
+            ok, problems, m = check_tail(voice, fin)
+            print("%s  %s  %-22s T=%s A=%s V=%s eind=%s woorden=%s" % (
+                "OK  " if ok else "FOUT", os.path.basename(d)[:8], os.path.basename(fin)[:22], _fmt(m["T"]),
+                _fmt(m["A"]), _fmt(m["V"]), _fmt(m["E"], "dB"), words if words is not None else "n/a"))
+            for pr in problems:
+                print("       - " + pr)
         shown += 1
         if shown >= args.last:
             break
