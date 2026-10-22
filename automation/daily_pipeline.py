@@ -404,6 +404,7 @@ def run_batch(topics: list) -> list:
     learnings = load_learnings()
     batch_path = os.path.join(BASE_DIR, "automation", "_run_batch.jsonl")
     subtitle_modes = []  # parallel to `topics`, so succeeded[] can log which mode each video got
+    experiment_arms = []  # idem: welke experimentvarianten elke video kreeg
     with open(batch_path, "w") as f:
         for topic in topics:
             # SCRIPT_STYLE_SUFFIX is a script-generation instruction, not part
@@ -420,8 +421,20 @@ def run_batch(topics: list) -> list:
             # so split evenly and let analyze_performance.py's real
             # retention data settle it instead of guessing -- see
             # subtitle_display_mode logged on log_entry below.
-            subtitle_display_mode = random.choice(["sentence", "word_by_word"])
+            # Zelflerende varianten (automation/experiments.py): lengte van het script en ondertitelstijl worden
+            # gewogen gekozen en schuiven vanzelf naar wat beter presteert. Valt terug op 50/50 als dat faalt.
+            try:
+                from automation import experiments
+                arms = experiments.choose_arms()
+                length_text = experiments.length_instruction(arms.get("length"))
+            except Exception as e:
+                print(f"experiments niet beschikbaar ({e}), 50/50 fallback")
+                arms = {"length": "long", "subtitles": random.choice(["sentence", "word_by_word"])}
+                length_text = "Write 70-90 words."
+            subtitle_display_mode = arms.get("subtitles") or random.choice(["sentence", "word_by_word"])
+            arms["subtitles"] = subtitle_display_mode
             subtitle_modes.append(subtitle_display_mode)
+            experiment_arms.append(arms)
             chosen_voice = voice_for_topic(topic)
             entry = {
                 "video_subject": topic,
@@ -434,7 +447,12 @@ def run_batch(topics: list) -> list:
                 "bgm_type": "custom",
                 "bgm_file": bgm_for_voice(chosen_voice),
             }
-            script_prompt_parts = [FOLLOW_CTA_INSTRUCTION, SCRIPT_STYLE_SUFFIX.strip()]
+            style_suffix = SCRIPT_STYLE_SUFFIX.strip()
+            if "Write 70-90 words." in style_suffix:
+                style_suffix = style_suffix.replace("Write 70-90 words.", length_text)
+            else:
+                style_suffix = f"{length_text} {style_suffix}"
+            script_prompt_parts = [FOLLOW_CTA_INSTRUCTION, style_suffix]
 
             # A different random sample per topic (not the whole fixed list
             # every time) so a day's 4 videos don't all lean on the same one
@@ -515,6 +533,7 @@ def run_batch(topics: list) -> list:
                     "final_video": final_video,
                     "combined_video": r["combined_videos"][0] if r.get("combined_videos") else None,
                     "subtitle_display_mode": subtitle_modes[task["index"] - 1],
+                    "experiment": experiment_arms[task["index"] - 1],
                     "carousel_slides": carousel_slides,
                 }
             )
@@ -658,6 +677,9 @@ def generate_new_topics(n: int, learnings: str, existing: list, inspiration: str
 
 
 RETRYABLE_STATUSES = {"failed", "blocked_meta"}
+# Platforms die niets opleveren worden niet meer bijgewerkt (Facebook: 44 views op 132 video's, wel risico op een
+# Meta-blokkade). Terugzetten kan met DISABLED_PLATFORMS="" in de omgeving van de pijplijn.
+DISABLED_PLATFORMS = {p.strip().lower() for p in os.getenv("DISABLED_PLATFORMS", "facebook").split(",") if p.strip()}
 
 
 def retry_failed_platforms(post_log: list):
@@ -715,7 +737,9 @@ def retry_failed_platforms(post_log: list):
 
         fb = platforms.get("facebook", {})
         ig = platforms.get("instagram", {})
-        fb_eligible = fb.get("status") in RETRYABLE_STATUSES and retries_done["facebook"] < MAX_RETRIES_PER_PLATFORM_PER_RUN
+        fb_eligible = ("facebook" not in DISABLED_PLATFORMS
+                       and fb.get("status") in RETRYABLE_STATUSES
+                       and retries_done["facebook"] < MAX_RETRIES_PER_PLATFORM_PER_RUN)
         ig_eligible = ig.get("status") in RETRYABLE_STATUSES and retries_done["instagram"] < MAX_RETRIES_PER_PLATFORM_PER_RUN
         meta_variant_path = video_path
         if fb_eligible or ig_eligible:
@@ -840,6 +864,7 @@ def main():
             # eventually compare retention between the two subtitle styles
             # once enough videos of each have real data.
             "subtitle_display_mode": item.get("subtitle_display_mode"),
+            "experiment": item.get("experiment"),
         }
 
         try:
@@ -907,25 +932,31 @@ def main():
             print(f"YouTube upload failed for {subject}: {e}")
             log_entry["platforms"]["youtube"] = {"status": "failed", "error": str(e)}
 
-        meta_variant_path = create_meta_variant(video_path)
+        facebook_on = "facebook" not in DISABLED_PLATFORMS
+        instagram_now = os.getenv("INSTAGRAM_MODE", "slot").strip().lower() != "slot"
+        # De Instagram-slotpublisher maakt zijn eigen kopie; hier alleen als Facebook of directe Instagram het nodig heeft.
+        meta_variant_path = create_meta_variant(video_path) if (facebook_on or instagram_now) else video_path
 
-        try:
-            fb_result = meta_api.upload_facebook_video(
-                video_path=meta_variant_path,
-                title=title,
-                description=description,
-                scheduled_publish_time=int(slot_dt.timestamp()),
-            )
-            state["last_scheduled_utc"] = candidate_scheduled_utc
-            print(f"Facebook scheduled: {fb_result.get('id')} at {candidate_scheduled_utc}")
-            log_entry["platforms"]["facebook"] = {
-                "id": fb_result.get("id"),
-                "status": "scheduled",
-                "scheduled_for": candidate_scheduled_utc,
-            }
-        except Exception as e:
-            print(f"Facebook upload failed for {subject}: {e}")
-            log_entry["platforms"]["facebook"] = {"status": "failed", "error": str(e)}
+        if not facebook_on:
+            log_entry["platforms"]["facebook"] = {"status": "disabled"}
+        else:
+            try:
+                fb_result = meta_api.upload_facebook_video(
+                    video_path=meta_variant_path,
+                    title=title,
+                    description=description,
+                    scheduled_publish_time=int(slot_dt.timestamp()),
+                )
+                state["last_scheduled_utc"] = candidate_scheduled_utc
+                print(f"Facebook scheduled: {fb_result.get('id')} at {candidate_scheduled_utc}")
+                log_entry["platforms"]["facebook"] = {
+                    "id": fb_result.get("id"),
+                    "status": "scheduled",
+                    "scheduled_for": candidate_scheduled_utc,
+                }
+            except Exception as e:
+                print(f"Facebook upload failed for {subject}: {e}")
+                log_entry["platforms"]["facebook"] = {"status": "failed", "error": str(e)}
 
         save_state(state)
 
@@ -1065,6 +1096,15 @@ def main():
         refresh_platform_stats()
     except Exception as e:
         print(f"Platform stats refresh failed (non-fatal): {e}")
+
+    try:
+        # De leerlus: herbereken per experiment welke variant wint en pas de verdeling aan (en schrijf
+        # automation/experiment_report.md). Draait na het verversen van de cijfers hierboven. Nooit fataal.
+        from automation import experiments
+        experiments.update_from_post_log(load_post_log())
+        print("Experiment weights updated, see automation/experiment_report.md")
+    except Exception as e:
+        print(f"Experiment update failed (non-fatal): {e}")
 
     try:
         # Sanitised status feed (no captions/paths/tokens) pushed to the
