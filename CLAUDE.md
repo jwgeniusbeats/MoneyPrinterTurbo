@@ -11,6 +11,7 @@
 - Geen subagents voor kleine taken. Verbose werk (tests, logs) in een subagent met een klein model.
 - Filter command-output (`| head`, `| tail`, `grep`) en print geen volledige logs.
 - Eén taak per sessie. Bij wisselen van onderwerp: nieuwe sessie of `/clear`.
+- Start de gebruiker na afronding een nieuw, ongerelateerd onderwerp? Zeg dan eerst in één zin dat een nieuwe sessie of `/clear` goedkoper is, en ga daarna pas verder.
 
 ## Compact instructions
 Bij `/compact`: bewaar alleen openstaande taken, genomen beslissingen en gewijzigde bestanden.
