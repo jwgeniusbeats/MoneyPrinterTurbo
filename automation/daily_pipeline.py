@@ -50,6 +50,7 @@ POST_LOG_FILE = os.path.join(BASE_DIR, "automation", "post_log.json")
 LEARNINGS_FILE = os.path.join(BASE_DIR, "automation", "learnings.md")
 INSPIRATION_FILE = os.path.join(BASE_DIR, "automation", "content_inspiration.md")
 VIDEOS_PER_RUN = 3
+MAX_INSPIRATION_CHARS = 4000
 # Must match app.models.schema.VideoParams.video_script_prompt's
 # Field(max_length=...) exactly -- see run_batch() for why going over this
 # is a same-day full-batch outage, not a per-entry warning.
@@ -243,7 +244,10 @@ def load_inspiration() -> str:
     if not os.path.exists(INSPIRATION_FILE):
         return ""
     with open(INSPIRATION_FILE) as f:
-        return f.read().strip()
+        text = f.read().strip()
+    # Het logboek groeit alleen; een te grote prompt gaf 413 bij de Groq-terugval (gratis TPM-limiet) en liet daarmee
+    # alle scripts falen. Het nieuwste staat onderaan, dus bewaar het staartstuk.
+    return text[-MAX_INSPIRATION_CHARS:] if len(text) > MAX_INSPIRATION_CHARS else text
 
 
 def load_post_log() -> list:
@@ -253,9 +257,19 @@ def load_post_log() -> list:
         return json.load(f)
 
 
+def _is_error_text(text) -> bool:
+    t = str(text).strip()
+    return t.startswith("Error") or "Error code:" in t
+
+
 def load_backlog() -> list:
     with open(BACKLOG_FILE) as f:
-        return json.load(f)
+        topics = json.load(f)
+    # Een LLM-foutmelding mag nooit als onderwerp worden behandeld (zo kreeg een video eerder een 413-fout als titel).
+    clean = [t for t in topics if not _is_error_text(t)]
+    if len(clean) != len(topics):
+        print(f"Dropped {len(topics) - len(clean)} error-text entries from the backlog.")
+    return clean
 
 
 def _atomic_write_json(path: str, data):
@@ -674,6 +688,8 @@ def generate_new_topics(n: int, learnings: str, existing: list, inspiration: str
     from app.services import llm as _llm
 
     response = _llm._generate_response(prompt=prompt)
+    if _is_error_text(response):
+        raise RuntimeError(f"topic generation failed: {str(response)[:200]}")
     lines = [ln.strip("-* \t") for ln in response.strip().splitlines() if ln.strip()]
     # Stored as plain topics -- SCRIPT_STYLE_SUFFIX is appended only at the
     # point of generation (run_batch), not baked into the topic's identity,
@@ -809,6 +825,9 @@ def main():
     print(f"Generating {len(topics)} videos...")
     finished = run_batch(topics)
     print(f"{len(finished)}/{len(topics)} videos finished successfully.")
+    if not finished:
+        # Stil falen was hoe dit 5 dagen onopgemerkt bleef: laat het horen.
+        notify_macos("Nognize pipeline", "Geen enkele video gelukt vandaag, zie automation/pipeline.log")
 
     # Remove finished topics by position within `topics`, not by string value:
     # two identical topic strings in the backlog (plausible -- LLM-brainstormed
