@@ -109,7 +109,7 @@ def evaluate(info, vids, now, days, min_subs, max_subs):
     urls = [u for u in URL.findall(info["desc"]) if "youtube.com" not in u][:2]
     score = (10 - min(10, (now - last).days)) + min(8, len(month)) * 2 + (1 - len(shorts) / len(vids)) * 10 + (3 if 1000 <= info["subs"] <= 50000 else 0)
     return {"channel": info["title"], "url": f"https://www.youtube.com/{info['handle']}" if info["handle"] else "", "subs": info["subs"], "country": info["country"],
-            "days_since_last_upload": (now - last).days, "uploads_last_30d": len(month), "shorts_in_last_%d" % len(vids): len(shorts),
+            "days_since_last_upload": (now - last).days, "uploads_last_30d": len(month), "videos_checked": len(vids), "shorts_in_those": len(shorts),
             "last_long_video": last_long["title"], "last_long_url": "https://www.youtube.com/watch?v=" + last_long["id"], "last_long_minutes": round(last_long["sec"] / 60),
             "public_email": ", ".join(emails), "website": ", ".join(urls), "score": round(score, 1)}
 
@@ -141,7 +141,7 @@ def write(leads):
         w = csv.DictWriter(f, fieldnames=list(leads[0].keys())); w.writeheader(); w.writerows(leads)
     with open(os.path.join(HERE, "leads.md"), "w") as f:
         for i, l in enumerate(leads, 1):
-            f.write(f"{i}. **{l['channel']}** ({l['subs']:,} subs) {l['url']}\n   last long video ({l['last_long_minutes']} min, {l['days_since_last_upload']} days ago): {l['last_long_url']}\n   {l['uploads_last_30d']} uploads in 30 days, shorts: {[v for k, v in l.items() if k.startswith('shorts_in')][0]}\n   contact (public): {l['public_email'] or l['website'] or 'none in description'}\n\n")
+            f.write(f"{i}. **{l['channel']}** ({l['subs']:,} subs) {l['url']}\n   last long video ({l['last_long_minutes']} min, {l['days_since_last_upload']} days ago): {l['last_long_url']}\n   {l['uploads_last_30d']} uploads in 30 days, shorts: {l['shorts_in_those']} of {l['videos_checked']}\n   contact (public): {l['public_email'] or l['website'] or 'none in description'}\n\n")
 
 
 def main(argv=None):

@@ -51,6 +51,10 @@ def test_filter():
     names = [l["channel"] for l in leads]
     assert names == ["Chan A", "Chan F"] or names == ["Chan F", "Chan A"], names
     assert leads[0]["public_email"] == "hi@example.com" and n == 6
+    import tempfile
+    y.HERE = tempfile.mkdtemp()            # writing must work even when channels have different video counts
+    y.write(leads)
+    assert os.path.getsize(os.path.join(y.HERE, "leads.csv")) > 0 and "Chan" in open(os.path.join(y.HERE, "leads.md")).read()
 
 
 def test_duration():
