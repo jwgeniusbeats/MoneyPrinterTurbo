@@ -20,6 +20,9 @@ CH = {  # channel id -> (subs, [(days_ago, seconds)])
     "C": (4000, [(1, 45)] * 8 + [(5, 3000)] * 3),                        # posts mostly shorts
     "D": (900000, [(1, 3000)] * 6),                                      # too big
     "E": (None, [(1, 3000)] * 6),                                        # hidden subscriber count
+    "G": (4000, [(i // 2, 3000) for i in range(30)]),                        # 30 uploads in a month: news desk / bot
+    "H": (4000, [(1, 3000)] * 6),                                            # fits the numbers but the name is a music channel
+    "I": (4000, [(1 + i, 14400) for i in range(6)]),                         # 4 hour streams only
     "F": (4000, [(3, None)] + [(2 + 6 * i, 3000) for i in range(1, 6)]),  # newest item is a live stream without duration
 }
 
@@ -28,7 +31,7 @@ def fake_api(path, p):
     if path == "search":
         return {"items": [{"snippet": {"channelId": c}} for c in CH]}
     if path == "channels":
-        return {"items": [{"id": c, "snippet": {"title": f"Chan {c}", "description": "mail me: hi@example.com https://example.com", "customUrl": f"@{c}"},
+        return {"items": [{"id": c, "snippet": {"title": ("Relax Music" if c == "H" else f"Chan {c}"), "description": "mail me: hi@example.com https://example.com", "customUrl": f"@{c}"},
                            "statistics": ({"hiddenSubscriberCount": True} if CH[c][0] is None else {"subscriberCount": str(CH[c][0])}),
                            "contentDetails": {"relatedPlaylists": {"uploads": "UU" + c}}} for c in p["id"].split(",")]}
     if path == "playlistItems":
@@ -50,7 +53,7 @@ def test_filter():
     leads, n = y.run(fake_api, ["q"], days=14, top=30, now=NOW)
     names = [l["channel"] for l in leads]
     assert names == ["Chan A", "Chan F"] or names == ["Chan F", "Chan A"], names
-    assert leads[0]["public_email"] == "hi@example.com" and n == 6
+    assert leads[0]["public_email"] == "hi@example.com" and n == 9
     import tempfile
     y.HERE = tempfile.mkdtemp()            # writing must work even when channels have different video counts
     y.write(leads)

@@ -28,10 +28,12 @@ from datetime import datetime, timedelta, timezone
 HERE = os.path.dirname(os.path.abspath(__file__))
 API = "https://www.googleapis.com/youtube/v3/"
 DEFAULT_QUERIES = {
-    "en": ["podcast episode interview", "business podcast", "coaching webinar replay", "mindset coach talk", "founder interview podcast",
-           "full podcast episode", "twitch vod highlights", "live stream replay talk", "keynote talk full", "fitness coach podcast"],
-    "nl": ["podcast aflevering interview", "ondernemers podcast", "coach webinar terugkijken", "interview ondernemer volledig", "podcast gesprek"],
+    "en": ["business coach interview", "mindset coach podcast", "entrepreneur interview podcast", "marketing podcast episode", "real estate podcast episode",
+           "leadership podcast interview", "founder story interview", "fitness coach podcast", "financial advisor podcast", "health coach interview",
+           "career coach podcast", "webinar replay coach", "consultant interview episode", "relationship coach podcast", "sales podcast interview"],
+    "nl": ["ondernemers podcast", "coach podcast aflevering", "interview ondernemer", "podcast gesprek ondernemer", "mindset coach interview", "vastgoed podcast"],
 }
+EXCLUDE = re.compile(r"music|muziek|beats?\b|sounds?\b|relax|sleep|lofi|church|kerk|ministry|college|school|university|news|nieuws|highlights|vods?\b|gaming|gameplay|sermon|prayer|astrology|horoscope", re.I)
 EMAIL = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
 URL = re.compile(r"https?://[^\s)>\"]+")
 
@@ -58,10 +60,15 @@ def chunks(xs, n):
 def find_candidates(api, queries, since, lang):
     seen = {}
     for q in queries:
-        j = api("search", {"part": "snippet", "q": q, "type": "video", "videoDuration": "long", "order": "date", "publishedAfter": since,
-                           "maxResults": 50, **({"relevanceLanguage": lang} if lang else {})})
-        for it in j.get("items", []):
-            seen.setdefault(it["snippet"]["channelId"], q)
+        token = None
+        for _page in range(2):
+            j = api("search", {"part": "snippet", "q": q, "type": "video", "videoDuration": "long", "order": "relevance", "publishedAfter": since,
+                               "maxResults": 50, **({"relevanceLanguage": lang} if lang else {}), **({"pageToken": token} if token else {})})
+            for it in j.get("items", []):
+                seen.setdefault(it["snippet"]["channelId"], q)
+            token = j.get("nextPageToken")
+            if not token:
+                break
     return seen
 
 
@@ -92,9 +99,9 @@ def recent_videos(api, uploads_id, n=30):
     return vids
 
 
-def evaluate(info, vids, now, days, min_subs, max_subs):
+def evaluate(info, vids, now, days, min_subs, max_subs, max_monthly=12, need_contact=True):
     """Return a lead dict or None. All facts come from the channel's own upload list."""
-    if not vids or info["subs"] is None or not (min_subs <= info["subs"] <= max_subs):
+    if not vids or info["subs"] is None or not (min_subs <= info["subs"] <= max_subs) or EXCLUDE.search(info["title"]):
         return None
     last = datetime.fromisoformat(vids[0]["published"].replace("Z", "+00:00"))
     if now - last > timedelta(days=days):
@@ -103,18 +110,24 @@ def evaluate(info, vids, now, days, min_subs, max_subs):
     longs = [v for v in vids if v["sec"] >= 600]
     if len(longs) < 3 or len(shorts) / len(vids) > 0.15:
         return None
-    last_long = next(v for v in vids if v["sec"] >= 600)
+    if sum(1 for v in longs if v["sec"] > 10800) / len(longs) > 0.3:   # mostly 3h+ = streams, loops, rebroadcasts
+        return None
     month = [v for v in vids if now - datetime.fromisoformat(v["published"].replace("Z", "+00:00")) <= timedelta(days=30)]
+    if len(month) > max_monthly:                                       # 13+ uploads a month = news desk, aggregator or bot
+        return None
+    last_long = next(v for v in vids if v["sec"] >= 600)
     emails = sorted(set(EMAIL.findall(info["desc"])))[:2]
-    urls = [u for u in URL.findall(info["desc"]) if "youtube.com" not in u][:2]
-    score = (10 - min(10, (now - last).days)) + min(8, len(month)) * 2 + (1 - len(shorts) / len(vids)) * 10 + (3 if 1000 <= info["subs"] <= 50000 else 0)
+    urls = [u for u in URL.findall(info["desc"]) if "youtube.com" not in u and "youtu.be" not in u][:2]
+    if need_contact and not (emails or urls):
+        return None
+    score = (10 - min(10, (now - last).days)) + (1 - len(shorts) / len(vids)) * 10 + (3 if 1000 <= info["subs"] <= 30000 else 0) + (3 if emails else 0) + (2 if urls else 0) + (2 if 2 <= len(month) <= 6 else 0)
     return {"channel": info["title"], "url": f"https://www.youtube.com/{info['handle']}" if info["handle"] else "", "subs": info["subs"], "country": info["country"],
             "days_since_last_upload": (now - last).days, "uploads_last_30d": len(month), "videos_checked": len(vids), "shorts_in_those": len(shorts),
             "last_long_video": last_long["title"], "last_long_url": "https://www.youtube.com/watch?v=" + last_long["id"], "last_long_minutes": round(last_long["sec"] / 60),
             "public_email": ", ".join(emails), "website": ", ".join(urls), "score": round(score, 1)}
 
 
-def run(api, queries, days=14, top=30, lang="en", min_subs=500, max_subs=100000, now=None):
+def run(api, queries, days=14, top=30, lang="en", min_subs=500, max_subs=100000, now=None, max_monthly=12, need_contact=True):
     now = now or datetime.now(timezone.utc)
     since = (now - timedelta(days=days)).strftime("%Y-%m-%dT%H:%M:%SZ")
     cands = find_candidates(api, queries, since, lang)
@@ -124,7 +137,7 @@ def run(api, queries, days=14, top=30, lang="en", min_subs=500, max_subs=100000,
         if info["subs"] is None or not (min_subs <= info["subs"] <= max_subs):
             continue
         try:
-            lead = evaluate(info, recent_videos(api, info["uploads"]), now, days, min_subs, max_subs)
+            lead = evaluate(info, recent_videos(api, info["uploads"]), now, days, min_subs, max_subs, max_monthly, need_contact)
         except Exception as e:  # one odd channel must never stop the whole run
             print("skipped", info.get("title"), type(e).__name__, str(e)[:80], file=sys.stderr)
             continue
@@ -147,6 +160,7 @@ def write(leads):
 def main(argv=None):
     ap = argparse.ArgumentParser(); ap.add_argument("--lang", default="en"); ap.add_argument("--days", type=int, default=14); ap.add_argument("--top", type=int, default=30)
     ap.add_argument("--queries"); ap.add_argument("--min-subs", type=int, default=500); ap.add_argument("--max-subs", type=int, default=100000)
+    ap.add_argument("--max-monthly", type=int, default=12, help="skip channels with more uploads than this in 30 days (news, bots)"); ap.add_argument("--any-contact", action="store_true", help="also keep channels without a public email or website")
     a = ap.parse_args(argv)
     key = os.environ.get("YT_API_KEY")
     if not key:
@@ -157,7 +171,7 @@ def main(argv=None):
         queries = DEFAULT_QUERIES["en"] + DEFAULT_QUERIES["nl"]
     else:
         queries = DEFAULT_QUERIES.get(a.lang, DEFAULT_QUERIES["en"])
-    leads, n = run(lambda p, q: http_api(p, q, key), queries, a.days, a.top, None if a.lang == "all" else a.lang, a.min_subs, a.max_subs)
+    leads, n = run(lambda p, q: http_api(p, q, key), queries, a.days, a.top, None if a.lang == "all" else a.lang, a.min_subs, a.max_subs, None, a.max_monthly, not a.any_contact)
     write(leads); print(f"{n} channels checked, {len(leads)} fit. Files: {HERE}/leads.csv and leads.md")
     return 0
 
