@@ -817,8 +817,20 @@ def main():
 
     backlog = load_backlog()
     if not backlog:
-        print("Topic backlog empty, nothing to do.")
-        return
+        # Een lege backlog mag de pipeline niet blokkeren: de refill hieronder
+        # draait alleen na een run, dus zonder dit blijft hij voor altijd leeg.
+        try:
+            backlog = generate_new_topics(
+                BACKLOG_REFILL_COUNT, load_learnings(), [], load_inspiration()
+            )
+        except Exception as e:
+            print(f"Backlog empty and auto-refill failed: {e}")
+            return
+        if not backlog:
+            print("Topic backlog empty, nothing to do.")
+            return
+        save_backlog(backlog)
+        print(f"Backlog empty, auto-refilled with {len(backlog)} new topics.")
     topics = backlog[:VIDEOS_PER_RUN]
     remaining = backlog[VIDEOS_PER_RUN:]
 
