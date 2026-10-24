@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.nognize.instagramslot</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/bin/env</string>
+        <string>uv</string>
+        <string>run</string>
+        <string>python</string>
+        <string>automation/instagram_slot_publisher.py</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>/Users/geniusbeats/MoneyPrinterTurbo</string>
+    <key>StartInterval</key>
+    <integer>600</integer>
+    <key>StandardOutPath</key>
+    <string>/Users/geniusbeats/MoneyPrinterTurbo/automation/instagram_slot.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/geniusbeats/MoneyPrinterTurbo/automation/instagram_slot.error.log</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    </dict>
+</dict>
+</plist>

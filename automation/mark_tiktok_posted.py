@@ -11,6 +11,7 @@ fix: it's what makes "live" mean "actually confirmed posted."
 
 Usage: uv run python automation/mark_tiktok_posted.py <video_path>
 """
+import os
 import sys
 from datetime import datetime, timezone
 
@@ -34,6 +35,13 @@ def main():
             if entry.get("video_path") == video_path:
                 match = entry
                 break
+        if match is None:
+            # Zelfde video, ander pad (bv. andere home-map of verplaatst): de mapnaam bevat het unieke
+            # task-id. Alleen gebruiken als er precies een entry past, anders niet gokken.
+            key = os.path.basename(os.path.dirname(video_path))
+            candidates = [e for e in entries if key and os.path.basename(os.path.dirname(e.get("video_path") or "")) == key]
+            if len(candidates) == 1:
+                match = candidates[0]
 
         if match is None:
             print(f"No post_log entry found with video_path == {video_path!r}", file=sys.stderr)

@@ -1,0 +1,17 @@
+{
+  "accent": "#3a6ee8",
+  "accent2": "#e8a13a",
+  "handle": "@yourbrand",
+  "scenes": [
+    {"kind": "hook", "dur": 4, "title": "Why freelancers work for free",
+     "say": "Why do freelancers keep working for free without noticing?"},
+    {"kind": "steps", "dur": 10, "title": "Where free work sneaks in",
+     "items": ["Endless revisions", "Vague project scope", "Calls nobody paid for"],
+     "say": "It sneaks in three ways. Endless revision rounds. A vague scope that keeps growing. And calls that nobody ever paid for."},
+    {"kind": "stat", "dur": 8, "title": "Set a limit upfront", "value": 3, "unit": "",
+     "label": "revision rounds, then it is paid",
+     "say": "Write a limit into every quote. Three revision rounds, and after that, extra work is paid."},
+    {"kind": "cta", "dur": 5, "title": "Put the limit in your next quote",
+     "say": "Put the limit in your next quote, before the work starts."}
+  ]
+}

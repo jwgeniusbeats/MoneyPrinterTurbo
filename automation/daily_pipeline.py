@@ -24,6 +24,11 @@ from zoneinfo import ZoneInfo
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, BASE_DIR)
 
+if __name__ == "__main__":
+    # Haal eerst de nieuwste levering binnen (en start dan opnieuw) voordat de rest wordt geimporteerd.
+    from automation.self_update import update_and_reexec
+    update_and_reexec()
+
 from app.services import instagram_api, llm, meta_api, tiktok_api, youtube_api  # noqa: E402
 from app.utils import utils  # noqa: E402
 from automation.notify import notify_macos  # noqa: E402
@@ -44,7 +49,8 @@ MANUAL_REMINDER_FILE = os.path.join(BASE_DIR, "automation", "manual_post_queue.t
 POST_LOG_FILE = os.path.join(BASE_DIR, "automation", "post_log.json")
 LEARNINGS_FILE = os.path.join(BASE_DIR, "automation", "learnings.md")
 INSPIRATION_FILE = os.path.join(BASE_DIR, "automation", "content_inspiration.md")
-VIDEOS_PER_RUN = 4
+VIDEOS_PER_RUN = 3
+MAX_INSPIRATION_CHARS = 4000
 # Must match app.models.schema.VideoParams.video_script_prompt's
 # Field(max_length=...) exactly -- see run_batch() for why going over this
 # is a same-day full-batch outage, not a per-entry warning.
@@ -238,7 +244,10 @@ def load_inspiration() -> str:
     if not os.path.exists(INSPIRATION_FILE):
         return ""
     with open(INSPIRATION_FILE) as f:
-        return f.read().strip()
+        text = f.read().strip()
+    # Het logboek groeit alleen; een te grote prompt gaf 413 bij de Groq-terugval (gratis TPM-limiet) en liet daarmee
+    # alle scripts falen. Het nieuwste staat onderaan, dus bewaar het staartstuk.
+    return text[-MAX_INSPIRATION_CHARS:] if len(text) > MAX_INSPIRATION_CHARS else text
 
 
 def load_post_log() -> list:
@@ -248,9 +257,19 @@ def load_post_log() -> list:
         return json.load(f)
 
 
+def _is_error_text(text) -> bool:
+    t = str(text).strip()
+    return t.startswith("Error") or "Error code:" in t
+
+
 def load_backlog() -> list:
     with open(BACKLOG_FILE) as f:
-        return json.load(f)
+        topics = json.load(f)
+    # Een LLM-foutmelding mag nooit als onderwerp worden behandeld (zo kreeg een video eerder een 413-fout als titel).
+    clean = [t for t in topics if not _is_error_text(t)]
+    if len(clean) != len(topics):
+        print(f"Dropped {len(topics) - len(clean)} error-text entries from the backlog.")
+    return clean
 
 
 def _atomic_write_json(path: str, data):
@@ -404,6 +423,7 @@ def run_batch(topics: list) -> list:
     learnings = load_learnings()
     batch_path = os.path.join(BASE_DIR, "automation", "_run_batch.jsonl")
     subtitle_modes = []  # parallel to `topics`, so succeeded[] can log which mode each video got
+    experiment_arms = []  # idem: welke experimentvarianten elke video kreeg
     with open(batch_path, "w") as f:
         for topic in topics:
             # SCRIPT_STYLE_SUFFIX is a script-generation instruction, not part
@@ -420,8 +440,20 @@ def run_batch(topics: list) -> list:
             # so split evenly and let analyze_performance.py's real
             # retention data settle it instead of guessing -- see
             # subtitle_display_mode logged on log_entry below.
-            subtitle_display_mode = random.choice(["sentence", "word_by_word"])
+            # Zelflerende varianten (automation/experiments.py): lengte van het script en ondertitelstijl worden
+            # gewogen gekozen en schuiven vanzelf naar wat beter presteert. Valt terug op 50/50 als dat faalt.
+            try:
+                from automation import experiments
+                arms = experiments.choose_arms()
+                length_text = experiments.length_instruction(arms.get("length"))
+            except Exception as e:
+                print(f"experiments niet beschikbaar ({e}), 50/50 fallback")
+                arms = {"length": "long", "subtitles": random.choice(["sentence", "word_by_word"])}
+                length_text = "Write 70-90 words."
+            subtitle_display_mode = arms.get("subtitles") or random.choice(["sentence", "word_by_word"])
+            arms["subtitles"] = subtitle_display_mode
             subtitle_modes.append(subtitle_display_mode)
+            experiment_arms.append(arms)
             chosen_voice = voice_for_topic(topic)
             entry = {
                 "video_subject": topic,
@@ -434,7 +466,12 @@ def run_batch(topics: list) -> list:
                 "bgm_type": "custom",
                 "bgm_file": bgm_for_voice(chosen_voice),
             }
-            script_prompt_parts = [FOLLOW_CTA_INSTRUCTION, SCRIPT_STYLE_SUFFIX.strip()]
+            style_suffix = SCRIPT_STYLE_SUFFIX.strip()
+            if "Write 70-90 words." in style_suffix:
+                style_suffix = style_suffix.replace("Write 70-90 words.", length_text)
+            else:
+                style_suffix = f"{length_text} {style_suffix}"
+            script_prompt_parts = [FOLLOW_CTA_INSTRUCTION, style_suffix]
 
             # A different random sample per topic (not the whole fixed list
             # every time) so a day's 4 videos don't all lean on the same one
@@ -515,13 +552,14 @@ def run_batch(topics: list) -> list:
                     "final_video": final_video,
                     "combined_video": r["combined_videos"][0] if r.get("combined_videos") else None,
                     "subtitle_display_mode": subtitle_modes[task["index"] - 1],
+                    "experiment": experiment_arms[task["index"] - 1],
                     "carousel_slides": carousel_slides,
                 }
             )
     return succeeded
 
 
-BACKLOG_REFILL_THRESHOLD = 8  # ~2 days of runway at VIDEOS_PER_RUN=4/day
+BACKLOG_REFILL_THRESHOLD = 8  # ~2.5 days of runway at VIDEOS_PER_RUN=3/day
 BACKLOG_REFILL_COUNT = 10
 # Retention on YouTube averages ~29% of the video (see learnings), so most
 # viewers leave early. The old suffix only asked for "a fast hook", which the
@@ -650,6 +688,8 @@ def generate_new_topics(n: int, learnings: str, existing: list, inspiration: str
     from app.services import llm as _llm
 
     response = _llm._generate_response(prompt=prompt)
+    if _is_error_text(response):
+        raise RuntimeError(f"topic generation failed: {str(response)[:200]}")
     lines = [ln.strip("-* \t") for ln in response.strip().splitlines() if ln.strip()]
     # Stored as plain topics -- SCRIPT_STYLE_SUFFIX is appended only at the
     # point of generation (run_batch), not baked into the topic's identity,
@@ -658,6 +698,9 @@ def generate_new_topics(n: int, learnings: str, existing: list, inspiration: str
 
 
 RETRYABLE_STATUSES = {"failed", "blocked_meta"}
+# Platforms die niets opleveren worden niet meer bijgewerkt (Facebook: 44 views op 132 video's, wel risico op een
+# Meta-blokkade). Terugzetten kan met DISABLED_PLATFORMS="" in de omgeving van de pijplijn.
+DISABLED_PLATFORMS = {p.strip().lower() for p in os.getenv("DISABLED_PLATFORMS", "facebook").split(",") if p.strip()}
 
 
 def retry_failed_platforms(post_log: list):
@@ -715,7 +758,9 @@ def retry_failed_platforms(post_log: list):
 
         fb = platforms.get("facebook", {})
         ig = platforms.get("instagram", {})
-        fb_eligible = fb.get("status") in RETRYABLE_STATUSES and retries_done["facebook"] < MAX_RETRIES_PER_PLATFORM_PER_RUN
+        fb_eligible = ("facebook" not in DISABLED_PLATFORMS
+                       and fb.get("status") in RETRYABLE_STATUSES
+                       and retries_done["facebook"] < MAX_RETRIES_PER_PLATFORM_PER_RUN)
         ig_eligible = ig.get("status") in RETRYABLE_STATUSES and retries_done["instagram"] < MAX_RETRIES_PER_PLATFORM_PER_RUN
         meta_variant_path = video_path
         if fb_eligible or ig_eligible:
@@ -772,14 +817,29 @@ def main():
 
     backlog = load_backlog()
     if not backlog:
-        print("Topic backlog empty, nothing to do.")
-        return
+        # Een lege backlog mag de pipeline niet blokkeren: de refill hieronder
+        # draait alleen na een run, dus zonder dit blijft hij voor altijd leeg.
+        try:
+            backlog = generate_new_topics(
+                BACKLOG_REFILL_COUNT, load_learnings(), [], load_inspiration()
+            )
+        except Exception as e:
+            print(f"Backlog empty and auto-refill failed: {e}")
+            return
+        if not backlog:
+            print("Topic backlog empty, nothing to do.")
+            return
+        save_backlog(backlog)
+        print(f"Backlog empty, auto-refilled with {len(backlog)} new topics.")
     topics = backlog[:VIDEOS_PER_RUN]
     remaining = backlog[VIDEOS_PER_RUN:]
 
     print(f"Generating {len(topics)} videos...")
     finished = run_batch(topics)
     print(f"{len(finished)}/{len(topics)} videos finished successfully.")
+    if not finished:
+        # Stil falen was hoe dit 5 dagen onopgemerkt bleef: laat het horen.
+        notify_macos("Nognize pipeline", "Geen enkele video gelukt vandaag, zie automation/pipeline.log")
 
     # Remove finished topics by position within `topics`, not by string value:
     # two identical topic strings in the backlog (plausible -- LLM-brainstormed
@@ -812,6 +872,25 @@ def main():
         subject = item["video_subject"]
         script = item["script"]
         video_path = item["final_video"]
+
+        # Niets uploaden waarvan het einde is afgekapt (bv. "...follow for more quick"). De controle kijkt naar
+        # het resultaat (stem tegenover eindvideo), faalt zelf nooit hard en staat uit met TAIL_CHECK=off.
+        try:
+            from automation.video_tail_check import verify_task_video
+            tail_ok, tail_problems, tail_metrics = verify_task_video(item["task_id"], video_path)
+        except Exception as e:
+            tail_ok, tail_problems, tail_metrics = True, [f"tail check mislukt: {e}"], {}
+        print(f"Tail check {subject!r}: ok={tail_ok} {tail_metrics} {tail_problems}")
+        if not tail_ok:
+            try:
+                with open(os.path.join(BASE_DIR, "automation", "blocked_videos.log"), "a") as bf:
+                    bf.write(f"{datetime.now(timezone.utc).isoformat()} | {item['task_id']} | {subject!r} | "
+                             f"{tail_problems} | {video_path}\n")
+            except OSError:
+                pass
+            notify_macos("Nognize", f"Video niet geüpload: einde afgekapt ({subject[:40]})", sound="Basso")
+            continue
+
         log_entry = {
             "task_id": item["task_id"],
             "subject": subject,
@@ -821,6 +900,7 @@ def main():
             # eventually compare retention between the two subtitle styles
             # once enough videos of each have real data.
             "subtitle_display_mode": item.get("subtitle_display_mode"),
+            "experiment": item.get("experiment"),
         }
 
         try:
@@ -888,38 +968,56 @@ def main():
             print(f"YouTube upload failed for {subject}: {e}")
             log_entry["platforms"]["youtube"] = {"status": "failed", "error": str(e)}
 
-        meta_variant_path = create_meta_variant(video_path)
+        facebook_on = "facebook" not in DISABLED_PLATFORMS
+        instagram_now = os.getenv("INSTAGRAM_MODE", "slot").strip().lower() != "slot"
+        # De Instagram-slotpublisher maakt zijn eigen kopie; hier alleen als Facebook of directe Instagram het nodig heeft.
+        meta_variant_path = create_meta_variant(video_path) if (facebook_on or instagram_now) else video_path
 
-        try:
-            fb_result = meta_api.upload_facebook_video(
-                video_path=meta_variant_path,
-                title=title,
-                description=description,
-                scheduled_publish_time=int(slot_dt.timestamp()),
-            )
+        if not facebook_on:
+            # Het slot is bezet door Instagram/YouTube; zonder Facebook moet de slotteller hier zelf doorschuiven,
+            # anders krijgen video's na een YouTube-fout hetzelfde slot.
             state["last_scheduled_utc"] = candidate_scheduled_utc
-            print(f"Facebook scheduled: {fb_result.get('id')} at {candidate_scheduled_utc}")
-            log_entry["platforms"]["facebook"] = {
-                "id": fb_result.get("id"),
-                "status": "scheduled",
-                "scheduled_for": candidate_scheduled_utc,
-            }
-        except Exception as e:
-            print(f"Facebook upload failed for {subject}: {e}")
-            log_entry["platforms"]["facebook"] = {"status": "failed", "error": str(e)}
+            log_entry["platforms"]["facebook"] = {"status": "disabled"}
+        else:
+            try:
+                fb_result = meta_api.upload_facebook_video(
+                    video_path=meta_variant_path,
+                    title=title,
+                    description=description,
+                    scheduled_publish_time=int(slot_dt.timestamp()),
+                )
+                state["last_scheduled_utc"] = candidate_scheduled_utc
+                print(f"Facebook scheduled: {fb_result.get('id')} at {candidate_scheduled_utc}")
+                log_entry["platforms"]["facebook"] = {
+                    "id": fb_result.get("id"),
+                    "status": "scheduled",
+                    "scheduled_for": candidate_scheduled_utc,
+                }
+            except Exception as e:
+                print(f"Facebook upload failed for {subject}: {e}")
+                log_entry["platforms"]["facebook"] = {"status": "failed", "error": str(e)}
 
         save_state(state)
 
-        try:
+        if os.getenv("INSTAGRAM_MODE", "slot").strip().lower() == "slot":
             # Instagram's API has no native "schedule for later" (unlike
-            # YouTube/Facebook), so it publishes immediately at generation
-            # time rather than waiting for the 13:00/20:00 slot.
-            ig_result = instagram_api.upload_reel_via_url(video_path=meta_variant_path, caption=description)
-            print(f"Instagram published: {ig_result.get('id')}")
-            log_entry["platforms"]["instagram"] = {"id": ig_result.get("id"), "status": "live"}
-        except Exception as e:
-            print(f"Instagram upload failed for {subject}: {e}")
-            log_entry["platforms"]["instagram"] = {"status": "failed", "error": str(e)}
+            # YouTube/Facebook), so the post is parked here and published at the
+            # same slot as YouTube/Facebook by automation/instagram_slot_publisher.py
+            # (launchd, every 10 minutes). INSTAGRAM_MODE=immediate restores the
+            # old behaviour of publishing right now, in a burst with the others.
+            log_entry["platforms"]["instagram"] = {
+                "status": "pending_slot",
+                "scheduled_for": candidate_scheduled_utc,
+            }
+            print(f"Instagram parked for slot {candidate_scheduled_utc}")
+        else:
+            try:
+                ig_result = instagram_api.upload_reel_via_url(video_path=meta_variant_path, caption=description)
+                print(f"Instagram published: {ig_result.get('id')}")
+                log_entry["platforms"]["instagram"] = {"id": ig_result.get("id"), "status": "live"}
+            except Exception as e:
+                print(f"Instagram upload failed for {subject}: {e}")
+                log_entry["platforms"]["instagram"] = {"status": "failed", "error": str(e)}
 
         if meta_variant_path != video_path and os.path.exists(meta_variant_path):
             os.remove(meta_variant_path)
@@ -1028,6 +1126,24 @@ def main():
         cleanup_storage_main(argv=[])
     except Exception as e:
         print(f"Storage cleanup failed (non-fatal): {e}")
+
+    try:
+        # Fresh YouTube/Instagram/Facebook numbers (and learnings.md) before the feed is built, so the
+        # feed's "dataAsOf" is today instead of the last manual analysis run. Once a day on purpose:
+        # Instagram insights cost one API call per video. Never fatal.
+        from automation.analyze_performance import main as refresh_platform_stats
+        refresh_platform_stats()
+    except Exception as e:
+        print(f"Platform stats refresh failed (non-fatal): {e}")
+
+    try:
+        # De leerlus: herbereken per experiment welke variant wint en pas de verdeling aan (en schrijf
+        # automation/experiment_report.md). Draait na het verversen van de cijfers hierboven. Nooit fataal.
+        from automation import experiments
+        experiments.update_from_post_log(load_post_log())
+        print("Experiment weights updated, see automation/experiment_report.md")
+    except Exception as e:
+        print(f"Experiment update failed (non-fatal): {e}")
 
     try:
         # Sanitised status feed (no captions/paths/tokens) pushed to the
