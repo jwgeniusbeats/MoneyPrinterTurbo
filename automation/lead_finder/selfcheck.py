@@ -20,6 +20,7 @@ CH = {  # channel id -> (subs, [(days_ago, seconds)])
     "C": (4000, [(1, 45)] * 8 + [(5, 3000)] * 3),                        # posts mostly shorts
     "D": (900000, [(1, 3000)] * 6),                                      # too big
     "E": (None, [(1, 3000)] * 6),                                        # hidden subscriber count
+    "F": (4000, [(3, None)] + [(2 + 6 * i, 3000) for i in range(1, 6)]),  # newest item is a live stream without duration
 }
 
 
@@ -37,7 +38,10 @@ def fake_api(path, p):
         out = []
         for vid_id in p["id"].split(","):
             c, i = vid_id[0], int(vid_id[1:]); d, s = CH[c][1][i]
-            out.append(vid(f"{c}{i}", d, s) | {"id": vid_id})
+            item = vid(f"{c}{i}", d, s or 0) | {"id": vid_id}
+            if s is None:
+                item["contentDetails"] = {}; item["snippet"]["liveBroadcastContent"] = "live"
+            out.append(item)
         return {"items": out}
     raise AssertionError(path)
 
@@ -45,8 +49,8 @@ def fake_api(path, p):
 def test_filter():
     leads, n = y.run(fake_api, ["q"], days=14, top=30, now=NOW)
     names = [l["channel"] for l in leads]
-    assert names == ["Chan A"], names
-    assert leads[0]["public_email"] == "hi@example.com" and leads[0]["days_since_last_upload"] == 2 and n == 5
+    assert names == ["Chan A", "Chan F"] or names == ["Chan F", "Chan A"], names
+    assert leads[0]["public_email"] == "hi@example.com" and n == 6
 
 
 def test_duration():

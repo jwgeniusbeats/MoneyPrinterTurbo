@@ -84,7 +84,10 @@ def recent_videos(api, uploads_id, n=30):
     for batch in chunks(ids, 50):
         v = api("videos", {"part": "snippet,contentDetails", "id": ",".join(batch), "maxResults": 50})
         for x in v.get("items", []):
-            vids.append({"id": x["id"], "title": x["snippet"]["title"], "published": x["snippet"]["publishedAt"], "sec": iso_seconds(x["contentDetails"]["duration"])})
+            dur = x.get("contentDetails", {}).get("duration")
+            if not dur or x.get("snippet", {}).get("liveBroadcastContent") in ("live", "upcoming"):
+                continue  # live streams and premieres have no final length yet
+            vids.append({"id": x["id"], "title": x["snippet"]["title"], "published": x["snippet"]["publishedAt"], "sec": iso_seconds(dur)})
     vids.sort(key=lambda x: x["published"], reverse=True)
     return vids
 
@@ -120,7 +123,11 @@ def run(api, queries, days=14, top=30, lang="en", min_subs=500, max_subs=100000,
     for cid, info in infos.items():
         if info["subs"] is None or not (min_subs <= info["subs"] <= max_subs):
             continue
-        lead = evaluate(info, recent_videos(api, info["uploads"]), now, days, min_subs, max_subs)
+        try:
+            lead = evaluate(info, recent_videos(api, info["uploads"]), now, days, min_subs, max_subs)
+        except Exception as e:  # one odd channel must never stop the whole run
+            print("skipped", info.get("title"), type(e).__name__, str(e)[:80], file=sys.stderr)
+            continue
         if lead:
             lead["found_via"] = cands[cid]; leads.append(lead)
     leads.sort(key=lambda x: x["score"], reverse=True)
