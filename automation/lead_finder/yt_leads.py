@@ -16,6 +16,7 @@ itself publishes in its public description. Check the rules for unsolicited mess
 before you write to anyone (in the Netherlands, one-to-one cold messages to sole traders are restricted).
 """
 import argparse
+from concurrent.futures import ThreadPoolExecutor
 import csv
 import json
 import os
@@ -131,18 +132,27 @@ def run(api, queries, days=14, top=30, lang="en", min_subs=500, max_subs=100000,
     now = now or datetime.now(timezone.utc)
     since = (now - timedelta(days=days)).strftime("%Y-%m-%dT%H:%M:%SZ")
     cands = find_candidates(api, queries, since, lang)
+    print(f"{len(cands)} channels found, checking their uploads...", file=sys.stderr, flush=True)
     infos = channel_info(api, cands)
-    leads = []
-    for cid, info in infos.items():
-        if info["subs"] is None or not (min_subs <= info["subs"] <= max_subs):
-            continue
+    todo = [(cid, i) for cid, i in infos.items() if i["subs"] is not None and min_subs <= i["subs"] <= max_subs and not EXCLUDE.search(i["title"])]
+    print(f"{len(todo)} left after size and name filter.", file=sys.stderr, flush=True)
+    leads, done = [], [0]
+
+    def check(item):
+        cid, info = item
         try:
             lead = evaluate(info, recent_videos(api, info["uploads"]), now, days, min_subs, max_subs, max_monthly, need_contact)
         except Exception as e:  # one odd channel must never stop the whole run
             print("skipped", info.get("title"), type(e).__name__, str(e)[:80], file=sys.stderr)
-            continue
+            lead = None
+        done[0] += 1
+        if done[0] % 25 == 0:
+            print(f"  {done[0]}/{len(todo)} checked", file=sys.stderr, flush=True)
         if lead:
-            lead["found_via"] = cands[cid]; leads.append(lead)
+            lead["found_via"] = cands[cid]
+        return lead
+    with ThreadPoolExecutor(max_workers=8) as ex:
+        leads = [l for l in ex.map(check, todo) if l]
     leads.sort(key=lambda x: x["score"], reverse=True)
     return leads[:top], len(cands)
 
