@@ -397,7 +397,7 @@ def _generate_response(prompt: str, app_config=None, _allow_fallback: bool = Tru
                 temperature=0.5,
                 top_p=1,
                 top_k=1,
-                max_output_tokens=2048,
+                max_output_tokens=8192,  # incl. denk-tokens; 2048 kapte scripts midden in een zin af
                 safety_settings=[
                     types.SafetySetting(
                         category="HARM_CATEGORY_HARASSMENT",
@@ -804,6 +804,50 @@ def build_script_prompt(
     return prompt
 
 
+# --- Afgebroken scripts opvangen -------------------------------------------------------------
+# Een LLM-antwoord kan midden in een zin stoppen (tokenlimiet, denk-tokens, onderbreking). De stem leest dan
+# precies die afgebroken tekst voor en de video eindigt op "... follow for more quick". Daarom: een script moet
+# op een afgeronde zin eindigen, anders opnieuw genereren, en als het blijft mislukken terugsnijden.
+_SCRIPT_END_CTA = "Follow for more mind-bending psychology facts."
+_TERMINAL_PUNCTUATION = ".!?\u2026"
+_CLOSING_QUOTES = "\"'\u201d\u2019)"
+_CTA_FINAL_NOUNS = (
+    "facts", "hacks", "tricks", "insights", "tips", "secrets", "content", "videos", "psychology", "science",
+    "ideas", "lessons", "stories", "answers", "knowledge", "thoughts", "reasons", "truths", "habits",
+)
+
+
+def _ends_with_terminal_punctuation(text: str) -> bool:
+    t = (text or "").rstrip()
+    while t and t[-1] in _CLOSING_QUOTES:
+        t = t[:-1]
+    return bool(t) and t[-1] in _TERMINAL_PUNCTUATION
+
+
+def _ends_like_a_finished_cta(text: str) -> bool:
+    """'... follow for more mind hacks' (geen punt) is af; '... follow for more quick' is afgebroken."""
+    last = re.split(r"[.!?\u2026]", (text or "").strip())[-1].strip().lower()
+    if not re.search(r"follow\s+(me\s+)?for\s+more", last):
+        return False
+    return re.sub(r"[^a-z]+$", "", last).split(" ")[-1].split("-")[-1] in _CTA_FINAL_NOUNS
+
+
+def script_is_complete(text: str) -> bool:
+    return _ends_with_terminal_punctuation(text) or _ends_like_a_finished_cta(text)
+
+
+def repair_truncated_script(text: str, cta: str = _SCRIPT_END_CTA) -> str:
+    """Laatste redmiddel: snijd terug tot de laatste afgeronde zin en sluit af met de vaste oproep."""
+    t = (text or "").strip()
+    ends = list(re.finditer(r"[.!?\u2026][\"'\u201d\u2019)]*(?=\s|$)", t))
+    if not ends:
+        return t
+    cut = t[: ends[-1].end()].strip()
+    if len(cut.split()) < 30:  # er blijft te weinig over: liever het origineel dan een stompje
+        return t
+    return cut if re.search(r"follow\s+(me\s+)?for\s+more", cut, re.I) else f"{cut} {cta}"
+
+
 def generate_script(
     video_subject: str,
     language: str = "",
@@ -827,6 +871,7 @@ def generate_script(
         custom_system_prompt=custom_system_prompt,
     )
     final_script = ""
+    last_incomplete_script = ""
     logger.info(
         "generating video script: "
         f"subject={video_subject}, paragraph_number={paragraph_number}, "
@@ -871,6 +916,16 @@ def generate_script(
             if final_script and "当日额度已消耗完" in final_script:
                 raise ValueError(final_script)
 
+            if final_script and not _ends_with_terminal_punctuation(final_script):
+                if _ends_like_a_finished_cta(final_script):
+                    final_script = final_script.rstrip() + "."
+                else:
+                    logger.warning(
+                        f"video script looks cut off (ends with {final_script.strip()[-50:]!r}), trying again"
+                    )
+                    last_incomplete_script = final_script
+                    final_script = ""
+
             if final_script:
                 break
         except Exception as e:
@@ -878,6 +933,9 @@ def generate_script(
 
         if i < _max_retries - 1:
             logger.warning(f"failed to generate video script, trying again... {i + 1}")
+    if not final_script and last_incomplete_script:
+        final_script = repair_truncated_script(last_incomplete_script)
+        logger.warning(f"every attempt was cut off, repaired by trimming to the last full sentence: {final_script[-80:]!r}")
     if "Error: " in final_script:
         logger.error(f"failed to generate video script: {final_script}")
     else:

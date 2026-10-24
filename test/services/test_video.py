@@ -922,7 +922,7 @@ class TestVideoService(unittest.TestCase):
 
         source_ranges, written_durations = self._capture_source_ranges_for_clip_speed(
             source_duration=4.0,
-            audio_duration=5.9,
+            audio_duration=5.9 - vd._FINAL_TAIL_PADDING_SECONDS,
             clip_speed=0.5,
         )
 
@@ -934,7 +934,7 @@ class TestVideoService(unittest.TestCase):
 
         source_ranges, written_durations = self._capture_source_ranges_for_clip_speed(
             source_duration=8.0,
-            audio_duration=2.9,
+            audio_duration=2.9 - vd._FINAL_TAIL_PADDING_SECONDS,
             clip_speed=2.0,
         )
 
@@ -1000,7 +1000,19 @@ class TestVideoService(unittest.TestCase):
 
         self.assertEqual(result, combined_video_path)
         self.assertEqual(write_mock.call_count, 4)
-        self.assertEqual(concat_mock.call_args.kwargs["max_duration"], 10.0)
+        self.assertAlmostEqual(
+            concat_mock.call_args.kwargs["max_duration"],
+            10.0 + vd._FINAL_TAIL_PADDING_SECONDS,
+        )
+
+    def test_required_video_duration_leaves_room_for_the_last_word(self):
+        """Het beeld moet na de audio nog een korte staart hebben, anders valt het laatste woord weg."""
+        required = vd._get_required_video_duration(10.0)
+        self.assertAlmostEqual(
+            required,
+            10.0 + vd._FINAL_TAIL_PADDING_SECONDS + vd._VIDEO_DURATION_SAFETY_MARGIN,
+        )
+        self.assertGreaterEqual(vd._FINAL_TAIL_PADDING_SECONDS, 0.3)
 
     def test_concat_video_clips_limits_output_to_audio_duration(self):
         """最终拼接时应裁到音频时长，避免安全余量带来明显静音尾巴。"""

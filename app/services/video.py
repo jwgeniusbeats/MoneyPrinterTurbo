@@ -79,6 +79,11 @@ fps = 30
 # 这里给视频素材多留一个很小的安全余量，避免音频末尾因为帧舍入出现黑屏、
 # 卡顿或最后一小段旁白没有画面的情况。
 _VIDEO_DURATION_SAFETY_MARGIN = 0.1
+# Staart na het laatste woord. De video werd exact op de audio-lengte afgekapt, maar
+# MoviePy leest de mp3-lengte vaak een paar tientallen ms te kort (en kapt de audio af
+# op het einde van het beeld), waardoor de laatste klank van de slotzin ("facts")
+# wegviel. Deze korte stilte laat het woord uitklinken.
+_FINAL_TAIL_PADDING_SECONDS = 0.4
 _MIN_MATERIAL_DIMENSION = 480
 # 消息类应用和部分编码器会把画面尺寸向下取整，例如 WhatsApp 会把 9:16 的
 # 素材压成 478x850，比 480 少两个像素。直接按 480 硬卡会让这类素材全部被
@@ -188,7 +193,10 @@ def _get_required_video_duration(audio_duration: float) -> float:
     音频时长时，FFmpeg 可能因为帧率舍入让最终视频略短，因此统一加一个
     轻量余量。函数独立出来，便于测试和后续按实际反馈调整余量大小。
     """
-    return max(0.0, float(audio_duration) + _VIDEO_DURATION_SAFETY_MARGIN)
+    return max(
+        0.0,
+        float(audio_duration) + _FINAL_TAIL_PADDING_SECONDS + _VIDEO_DURATION_SAFETY_MARGIN,
+    )
 
 
 def is_material_resolution_acceptable(width: int, height: int) -> bool:
@@ -966,7 +974,7 @@ def combine_videos(
         output_file=combined_video_path,
         threads=threads,
         output_dir=output_dir,
-        max_duration=audio_duration,
+        max_duration=audio_duration + _FINAL_TAIL_PADDING_SECONDS,
     )
     if used_video_paths is not None:
         # Exclude safety-margin clips that FFmpeg trims entirely from the output.
