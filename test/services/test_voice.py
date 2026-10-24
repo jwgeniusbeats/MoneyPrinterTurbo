@@ -1095,6 +1095,15 @@ class TestVoiceService(unittest.TestCase):
             self.assertIn("now", subtitle_content)
             self.assertIn("Testing multiple lines", subtitle_content)
 
+    def test_script_split_keeps_clock_time_colon(self):
+        """A clock time such as "10:30" or a ratio like "16:9" is no line break."""
+        text = "Class starts at 10:30. We film in 16:9."
+
+        self.assertEqual(
+            utils.split_string_by_punctuations(text),
+            ["Class starts at 10:30", "We film in 16:9"],
+        )
+
     def test_script_split_keeps_thousand_separator_comma(self):
         """
         Edge TTS 会把 "1,000 years" 作为连续文本返回。脚本断句时不能把
