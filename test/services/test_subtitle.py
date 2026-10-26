@@ -9,6 +9,7 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from app.services import subtitle
+from app.utils import utils
 
 
 class TestSubtitleService(unittest.TestCase):
@@ -207,6 +208,16 @@ class TestSubtitleService(unittest.TestCase):
         self.assertIn("第二段", corrected_srt)
         self.assertNotIn("---", corrected_srt)
         self.assertNotIn("00:00:00,000 --> 00:00:00,000", corrected_srt)
+
+    def test_normalize_script_drops_symbol_only_scene_breaks(self):
+        for separator in ["* * *", "\u2014\u2014\u2014", "\u2022 \u2022 \u2022", "= = =", "---"]:
+            with self.subTest(separator=separator):
+                normalized = utils.normalize_script_for_subtitle_matching(
+                    f"Welcome to the show.\n{separator}\nLet us begin."
+                )
+                self.assertNotIn(separator, normalized)
+                self.assertIn("Welcome to the show.", normalized)
+                self.assertIn("Let us begin.", normalized)
 
     def test_correct_merges_adjacent_subtitles_for_one_script_sentence(self):
         """

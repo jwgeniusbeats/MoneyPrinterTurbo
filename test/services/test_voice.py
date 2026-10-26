@@ -1161,6 +1161,21 @@ class TestVoiceService(unittest.TestCase):
         # subtitle items.
         self.assertTrue(any("1,000 years" in item for item in sub_items))
 
+    def test_script_split_keeps_dots_inside_abbreviations_and_names(self):
+        """A dot between two letters belongs to "U.S.", "e.g." or "example.com", not a line break."""
+        text = "The U.S. economy grew. Visit example.com for the details, e.g. the prices."
+
+        self.assertEqual(
+            utils.split_string_by_punctuations(text),
+            [
+                "The U.S",
+                "economy grew",
+                "Visit example.com for the details",
+                "e.g",
+                "the prices",
+            ],
+        )
+
     def test_script_split_supports_arabic_punctuation(self):
         """
         阿拉伯语脚本常用 ، ؛ ؟ 作为自然断句标点。断句阶段必须识别这些
