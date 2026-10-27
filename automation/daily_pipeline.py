@@ -658,6 +658,8 @@ def generate_new_topics(n: int, learnings: str, existing: list, inspiration: str
 
 
 RETRYABLE_STATUSES = {"failed", "blocked_meta"}
+# Facebook levert vrijwel geen views op (44 over 138 video's); standaard uit.
+FACEBOOK_ENABLED = os.getenv("FACEBOOK_ENABLED", "0").strip().lower() in ("1", "true", "yes")
 
 
 def retry_failed_platforms(post_log: list):
@@ -715,7 +717,7 @@ def retry_failed_platforms(post_log: list):
 
         fb = platforms.get("facebook", {})
         ig = platforms.get("instagram", {})
-        fb_eligible = fb.get("status") in RETRYABLE_STATUSES and retries_done["facebook"] < MAX_RETRIES_PER_PLATFORM_PER_RUN
+        fb_eligible = FACEBOOK_ENABLED and fb.get("status") in RETRYABLE_STATUSES and retries_done["facebook"] < MAX_RETRIES_PER_PLATFORM_PER_RUN
         ig_eligible = ig.get("status") in RETRYABLE_STATUSES and retries_done["instagram"] < MAX_RETRIES_PER_PLATFORM_PER_RUN
         meta_variant_path = video_path
         if fb_eligible or ig_eligible:
@@ -890,23 +892,24 @@ def main():
 
         meta_variant_path = create_meta_variant(video_path)
 
-        try:
-            fb_result = meta_api.upload_facebook_video(
-                video_path=meta_variant_path,
-                title=title,
-                description=description,
-                scheduled_publish_time=int(slot_dt.timestamp()),
-            )
-            state["last_scheduled_utc"] = candidate_scheduled_utc
-            print(f"Facebook scheduled: {fb_result.get('id')} at {candidate_scheduled_utc}")
-            log_entry["platforms"]["facebook"] = {
-                "id": fb_result.get("id"),
-                "status": "scheduled",
-                "scheduled_for": candidate_scheduled_utc,
-            }
-        except Exception as e:
-            print(f"Facebook upload failed for {subject}: {e}")
-            log_entry["platforms"]["facebook"] = {"status": "failed", "error": str(e)}
+        if FACEBOOK_ENABLED:
+            try:
+                fb_result = meta_api.upload_facebook_video(
+                    video_path=meta_variant_path,
+                    title=title,
+                    description=description,
+                    scheduled_publish_time=int(slot_dt.timestamp()),
+                )
+                state["last_scheduled_utc"] = candidate_scheduled_utc
+                print(f"Facebook scheduled: {fb_result.get('id')} at {candidate_scheduled_utc}")
+                log_entry["platforms"]["facebook"] = {
+                    "id": fb_result.get("id"),
+                    "status": "scheduled",
+                    "scheduled_for": candidate_scheduled_utc,
+                }
+            except Exception as e:
+                print(f"Facebook upload failed for {subject}: {e}")
+                log_entry["platforms"]["facebook"] = {"status": "failed", "error": str(e)}
 
         save_state(state)
 
