@@ -529,7 +529,9 @@ BACKLOG_REFILL_COUNT = 10
 # wondered..."). This spells out what the first sentence must do instead.
 SCRIPT_STYLE_SUFFIX = (
     " Write 70-90 words. The first sentence decides everything: at most 12 words, "
-    "a concrete, specific claim or tension about the viewer's own life, with no "
+    "a concrete, specific claim or tension about the viewer's own life, "
+    "described as a recognisable moment or scene (e.g. a familiar room suddenly "
+    "feeling foreign), not an abstract statement about the mind, with no "
     "greeting and no 'did you know', 'have you ever wondered' or 'in this video'. "
     "Open a loop in the first two sentences and pay it off in the last third. "
     "Keep sentences under 14 words, one idea each, no filler. "
@@ -644,6 +646,11 @@ def generate_new_topics(n: int, learnings: str, existing: list, inspiration: str
         + guidance
         + inspiration_guidance
         + trend_guidance
+        + "\n\nEvery topic must be a recognisable everyday moment or sensation the viewer has "
+        "personally experienced (e.g. a familiar place suddenly feeling strange, a product that "
+        "sticks in memory), with the named phenomenon as the explanation. Our best performers on "
+        "this channel are exactly this. Avoid broad, overcrowded themes such as imposter "
+        "syndrome, placebo, or generic self-improvement; they got near-zero views here."
         + f"\n\nReply with exactly {n} lines, one topic per line, no numbering, no extra text."
     ).format(n=n)
 
