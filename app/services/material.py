@@ -1005,6 +1005,34 @@ def _save_generated_video_with_retry(
     return ""
 
 
+def _is_playable_video(video_path: str) -> bool:
+    """Probe a video file with MoviePy; True only when duration and fps are valid."""
+    clip = None
+    try:
+        clip = VideoFileClip(video_path)
+        return bool(clip.duration > 0 and clip.fps > 0)
+    except Exception as e:
+        logger.warning(f"invalid video file: {video_path} => {str(e)}")
+        return False
+    finally:
+        if clip is not None:
+            try:
+                clip.close()
+            except Exception as close_error:
+                logger.warning(
+                    f"failed to close video clip: {video_path}, error: {str(close_error)}"
+                )
+
+
+def _remove_quietly(path: str) -> None:
+    try:
+        os.remove(path)
+    except FileNotFoundError:
+        pass
+    except Exception as remove_error:
+        logger.warning(f"failed to remove file: {path}, error: {str(remove_error)}")
+
+
 def save_video(video_url: str, save_dir: str = "") -> str:
     if not save_dir:
         save_dir = utils.storage_dir("cache_videos")
@@ -1017,51 +1045,41 @@ def save_video(video_url: str, save_dir: str = "") -> str:
     video_id = f"vid-{url_hash}"
     video_path = f"{save_dir}/{video_id}.mp4"
 
-    # if video already exists, return the path
+    # A nonempty cache file can still be truncated (interrupted download, crash
+    # mid-write). Validate before reuse so a corrupt entry self-repairs instead
+    # of failing every later render. Mirrors upstream harry0703/MoneyPrinterTurbo
+    # 1cebc65 (fix(material): repair corrupt caches).
     if os.path.exists(video_path) and os.path.getsize(video_path) > 0:
-        logger.info(f"video already exists: {video_path}")
-        return video_path
+        if _is_playable_video(video_path):
+            logger.info(f"video already exists: {video_path}")
+            return video_path
+        logger.warning(f"discarding invalid cached video: {video_path}")
+        _remove_quietly(video_path)
 
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36"
     }
 
-    # if video does not exist, download it
-    with open(video_path, "wb") as f:
-        f.write(
-            requests.get(
-                video_url,
-                headers=headers,
-                proxies=config.proxy,
-                verify=_get_tls_verify(),
-                timeout=(60, 240),
-            ).content
-        )
+    # Download to a temp file and publish atomically, so an interrupted write
+    # never leaves a truncated file at the cache path.
+    temp_path = f"{video_path}.{os.getpid()}.part"
+    try:
+        with open(temp_path, "wb") as f:
+            f.write(
+                requests.get(
+                    video_url,
+                    headers=headers,
+                    proxies=config.proxy,
+                    verify=_get_tls_verify(),
+                    timeout=(60, 240),
+                ).content
+            )
 
-    if os.path.exists(video_path) and os.path.getsize(video_path) > 0:
-        clip = None
-        try:
-            clip = VideoFileClip(video_path)
-            duration = clip.duration
-            fps = clip.fps
-            if duration > 0 and fps > 0:
-                return video_path
-        except Exception as e:
-            logger.warning(f"invalid video file: {video_path} => {str(e)}")
-            try:
-                os.remove(video_path)
-            except Exception as remove_error:
-                logger.warning(
-                    f"failed to remove invalid video file: {video_path}, error: {str(remove_error)}"
-                )
-        finally:
-            if clip is not None:
-                try:
-                    clip.close()
-                except Exception as close_error:
-                    logger.warning(
-                        f"failed to close video clip: {video_path}, error: {str(close_error)}"
-                    )
+        if os.path.getsize(temp_path) > 0 and _is_playable_video(temp_path):
+            os.replace(temp_path, video_path)
+            return video_path
+    finally:
+        _remove_quietly(temp_path)
     return ""
 
 

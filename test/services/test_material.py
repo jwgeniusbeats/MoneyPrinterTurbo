@@ -582,6 +582,61 @@ class TestMaterialTlsVerification(unittest.TestCase):
             self.assertTrue(os.path.exists(video_path))
             self.assertTrue(get.call_args.kwargs["verify"])
 
+    def test_save_video_replaces_corrupt_cache_entry(self):
+        config.proxy.clear()
+        url = "https://example.com/video.mp4"
+        good = SimpleNamespace(content=b"good-video")
+
+        class FakeVideoFileClip:
+            duration = 1
+            fps = 24
+
+            def __init__(self, path):
+                with open(path, "rb") as f:
+                    if f.read() != b"good-video":
+                        raise OSError("truncated")
+
+            def close(self):
+                return None
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            cache_path = os.path.join(
+                temp_dir, f"vid-{material.utils.md5(url)}.mp4"
+            )
+            with open(cache_path, "wb") as f:
+                f.write(b"trunc")
+            with patch(
+                "app.services.material.requests.get", return_value=good
+            ) as get, patch("app.services.material.VideoFileClip", FakeVideoFileClip):
+                video_path = material.save_video(url, save_dir=temp_dir)
+
+            self.assertEqual(video_path, cache_path)
+            get.assert_called_once()
+            with open(cache_path, "rb") as f:
+                self.assertEqual(f.read(), b"good-video")
+            self.assertEqual(
+                [n for n in os.listdir(temp_dir) if n.endswith(".part")], []
+            )
+
+    def test_save_video_leaves_no_file_when_download_is_invalid(self):
+        config.proxy.clear()
+
+        class BadVideoFileClip:
+            def __init__(self, path):
+                raise OSError("not a video")
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with patch(
+                "app.services.material.requests.get",
+                return_value=SimpleNamespace(content=b"junk"),
+            ), patch("app.services.material.VideoFileClip", BadVideoFileClip):
+                video_path = material.save_video(
+                    "https://example.com/bad.mp4", save_dir=temp_dir
+                )
+
+            self.assertEqual(video_path, "")
+            self.assertEqual(os.listdir(temp_dir), [])
+
     def test_download_videos_accepts_plain_string_concat_mode(self):
         """
         download_videos 可能被服务层或测试直接传入字符串模式，而不是
