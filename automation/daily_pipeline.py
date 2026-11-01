@@ -651,11 +651,11 @@ def generate_new_topics(n: int, learnings: str, existing: list, inspiration: str
         "sticks in memory), with the named phenomenon as the explanation. Our best performers on "
         "this channel are exactly this. Avoid broad, overcrowded themes such as imposter "
         "syndrome, placebo, or generic self-improvement; they got near-zero views here."
-        "\n\nExperiment: roughly 1 in 4 topics should instead be a practical 'How to survive ...' "
-        "topic (an everyday or unlikely situation, e.g. a power cut in a lift, getting lost on a "
-        "hike) phrased so the title starts with 'How to survive'. Keep the other 3 in 4 as the "
-        "recognisable-sensation psychology topics above, and do not mix the two styles within "
-        "one topic."
+        "\n\nExperiment: roughly 1 in 4 topics should instead be a practical, useful 'How to ...' "
+        "topic about a real situation the viewer might face (survival, the body, everyday "
+        "emergencies, small life skills), phrased so the title starts with 'How to'. Vary the "
+        "subject freely between these. Keep the other 3 in 4 as the recognisable-sensation "
+        "psychology topics above, and do not mix the two styles within one topic."
         + f"\n\nReply with exactly {n} lines, one topic per line, no numbering, no extra text."
     ).format(n=n)
 
