@@ -837,7 +837,7 @@ class TestLiteLLMProvider(unittest.TestCase):
         )
         self.assertEqual(captured["model"], "gemini-test-model")
         self.assertEqual(captured["contents"], "Say hello")
-        self.assertEqual(captured["config"].max_output_tokens, 2048)
+        self.assertEqual(captured["config"].max_output_tokens, 8192)
         self.assertTrue(captured["closed"])
 
     def test_gemini_failure_falls_back_to_groq_when_key_configured(self):

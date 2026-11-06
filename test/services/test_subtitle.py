@@ -240,10 +240,11 @@ class TestSubtitleService(unittest.TestCase):
         self.assertEqual(items[0][1], "00:00:00,100 --> 00:00:02,000")
         self.assertEqual(items[0][2], "Hello world")
 
-    def test_correct_replaces_mismatch_and_appends_missing_script_line(self):
+    def test_correct_preserves_original_when_script_has_extra_lines(self):
         """
-        转写结果与脚本完全不一致时仍应以脚本为准；脚本多出的句子没有可复用
-        时间轴时使用明确的零时间占位，避免丢失文本且保持现有兼容行为。
+        Mirrors upstream b42ecbc: when the script has more lines than the
+        transcription has timed cues, keep the original timed transcription
+        instead of appending zero-length captions that can never display.
         """
         original_srt = "1\n00:00:00,100 --> 00:00:01,000\nWrong text\n\n"
 
@@ -252,13 +253,10 @@ class TestSubtitleService(unittest.TestCase):
             subtitle_file.write_text(original_srt, encoding="utf-8")
 
             subtitle.correct(str(subtitle_file), "Expected sentence. Extra sentence.")
-            items = subtitle.file_to_subtitles(str(subtitle_file))
+            result = subtitle_file.read_text(encoding="utf-8")
 
-        self.assertEqual(
-            [item[2] for item in items],
-            ["Expected sentence", "Extra sentence"],
-        )
-        self.assertEqual(items[1][1], "00:00:00,000 --> 00:00:00,000")
+        self.assertEqual(result, original_srt)
+        self.assertNotIn("00:00:00,000 --> 00:00:00,000", result)
 
     def test_file_to_subtitles_keeps_last_block_without_trailing_newline(self):
         """

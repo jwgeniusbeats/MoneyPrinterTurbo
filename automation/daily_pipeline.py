@@ -237,6 +237,9 @@ def load_learnings() -> str:
         return f.read().strip()
 
 
+INSPIRATION_MAX_CHARS = 6000
+
+
 def load_inspiration() -> str:
     """Structural formats/angles logged by hand during engagement rounds
     (automation/content_inspiration.md) -- that file's own "How to apply"
@@ -245,7 +248,17 @@ def load_inspiration() -> str:
     if not os.path.exists(INSPIRATION_FILE):
         return ""
     with open(INSPIRATION_FILE) as f:
-        return f.read().strip()
+        text = f.read().strip()
+    # The file grows with every engagement round (64KB by 2026-10-27); fed
+    # whole into the refill prompt it exceeded Groq's 8000 TPM request limit
+    # (413), so every refill failed and the backlog ran dry. Keep only the
+    # "Formats worth stealing" section (the part the refill prompt asks for),
+    # capped.
+    start = text.find("## Formats worth stealing")
+    if start != -1:
+        end = text.find("\n## ", start + 1)
+        text = text[start:end if end != -1 else len(text)]
+    return text[:INSPIRATION_MAX_CHARS]
 
 
 def load_post_log() -> list:
@@ -578,9 +591,19 @@ CLOSING_TEASER_INSTRUCTION = (
     "secrets.\" Do NOT ask the viewer to follow, subscribe, like or comment: "
     "that is added separately."
 )
+# Retention on YouTube averages ~29% of the video (see learnings), so most
+# viewers leave early. The old suffix only asked for "a fast hook", which the
+# model satisfied with generic openers ("Did you know...", "Have you ever
+# wondered..."). This spells out what the first sentence must do instead.
 SCRIPT_STYLE_SUFFIX = (
-    " Keep the script short and punchy, about 80-100 words total, "
-    "fast hook in the first sentence."
+    " Write 70-90 words. The first sentence decides everything: at most 12 words, "
+    "a concrete, specific claim or tension about the viewer's own life, "
+    "described as a recognisable moment or scene (e.g. a familiar room suddenly "
+    "feeling foreign), not an abstract statement about the mind, with no "
+    "greeting and no 'did you know', 'have you ever wondered' or 'in this video'. "
+    "Open a loop in the first two sentences and pay it off in the last third. "
+    "Keep sentences under 14 words, one idea each, no filler. "
+    "Where it fits, let the final sentence echo the opening line."
 )
 
 # Curated from resources/tiktok-viral-hooks (shixinzhang/tiktok-viral-hooks,
@@ -669,7 +692,7 @@ def generate_new_topics(n: int, learnings: str, existing: list, inspiration: str
         if trends else ""
     )
     prompt = (
-        "Brainstorm {n} new video topic ideas for a faceless psychology/mind-facts "
+        f"Brainstorm {n} new video topic ideas for a faceless psychology/mind-facts "
         "short-form video channel (TikTok/YouTube Shorts/Instagram Reels). "
         "Each topic should be a single punchy sentence describing a specific, "
         "surprising psychological phenomenon or mind fact — the kind that makes "
@@ -678,17 +701,26 @@ def generate_new_topics(n: int, learnings: str, existing: list, inspiration: str
         + guidance
         + inspiration_guidance
         + trend_guidance
+        + "\n\nEvery topic must be a recognisable everyday moment or sensation the viewer has "
+        "personally experienced (e.g. a familiar place suddenly feeling strange, a product that "
+        "sticks in memory), with the named phenomenon as the explanation. Our best performers on "
+        "this channel are exactly this. Avoid broad, overcrowded themes such as imposter "
+        "syndrome, placebo, or generic self-improvement; they got near-zero views here."
         + f"\n\nReply with exactly {n} lines, one topic per line, no numbering, no extra text."
-    ).format(n=n)
+    )
+    # No str.format() over the assembled prompt: it embeds topics, learnings and
+    # inspiration text, and any literal "{...}" in them (e.g. a polluted topic
+    # holding "{'error': ...}") raised KeyError and killed every auto-refill.
 
     from app.services import llm as _llm
 
     response = _llm._generate_response(prompt=prompt)
-    # _generate_response reports failures (rate limit, auth) as an "Error: ..."
-    # string instead of raising. Without this check the error text became a
-    # backlog topic and was posted as a video subject/SEO tag (2026-10-18).
-    if response.strip().startswith("Error"):
-        raise RuntimeError(f"topic generation LLM call failed: {response.strip()[:200]}")
+    # _generate_response returns "Error: ..." as a normal string on failure;
+    # without this check the error text became a topic (real incident
+    # 2026-10-18 and 2026-10-27: a Groq 413 message was rendered, titled and
+    # posted as a video).
+    if response.lstrip().startswith("Error"):
+        raise RuntimeError(f"topic generation LLM call failed: {response[:200]}")
     lines = [ln.strip("-* \t") for ln in response.strip().splitlines() if ln.strip()]
     # Stored as plain topics -- SCRIPT_STYLE_SUFFIX is appended only at the
     # point of generation (run_batch), not baked into the topic's identity,
@@ -697,6 +729,8 @@ def generate_new_topics(n: int, learnings: str, existing: list, inspiration: str
 
 
 RETRYABLE_STATUSES = {"failed", "blocked_meta"}
+# Facebook levert vrijwel geen views op (44 over 138 video's); standaard uit.
+FACEBOOK_ENABLED = os.getenv("FACEBOOK_ENABLED", "0").strip().lower() in ("1", "true", "yes")
 
 
 def retry_failed_platforms(post_log: list):
@@ -754,7 +788,7 @@ def retry_failed_platforms(post_log: list):
 
         fb = platforms.get("facebook", {})
         ig = platforms.get("instagram", {})
-        fb_eligible = fb.get("status") in RETRYABLE_STATUSES and retries_done["facebook"] < MAX_RETRIES_PER_PLATFORM_PER_RUN
+        fb_eligible = FACEBOOK_ENABLED and fb.get("status") in RETRYABLE_STATUSES and retries_done["facebook"] < MAX_RETRIES_PER_PLATFORM_PER_RUN
         ig_eligible = ig.get("status") in RETRYABLE_STATUSES and retries_done["instagram"] < MAX_RETRIES_PER_PLATFORM_PER_RUN
         meta_variant_path = video_path
         if fb_eligible or ig_eligible:
@@ -811,8 +845,21 @@ def main():
 
     backlog = load_backlog()
     if not backlog:
-        print("Topic backlog empty, nothing to do.")
-        return
+        # Empty backlog used to be a dead end: the refill below only runs after
+        # a batch, so one failed refill left the pipeline idle forever.
+        print("Topic backlog empty, attempting refill before giving up.")
+        try:
+            used = [e.get("subject", "") for e in post_log if e.get("subject")]
+            backlog = generate_new_topics(
+                BACKLOG_REFILL_COUNT, load_learnings(), used, load_inspiration()
+            )
+            if backlog:
+                save_backlog(backlog)
+        except Exception as e:
+            print(f"Backlog refill failed: {e}")
+        if not backlog:
+            print("Topic backlog empty, nothing to do.")
+            return
     topics = backlog[:VIDEOS_PER_RUN]
     remaining = backlog[VIDEOS_PER_RUN:]
 
@@ -851,6 +898,25 @@ def main():
         subject = item["video_subject"]
         script = item["script"]
         video_path = item["final_video"]
+
+        # Niets uploaden waarvan het einde is afgekapt (bv. "...follow for more quick"). De controle kijkt naar
+        # het resultaat (stem tegenover eindvideo), faalt zelf nooit hard en staat uit met TAIL_CHECK=off.
+        try:
+            from automation.video_tail_check import verify_task_video
+            tail_ok, tail_problems, tail_metrics = verify_task_video(item["task_id"], video_path)
+        except Exception as e:
+            tail_ok, tail_problems, tail_metrics = True, [f"tail check mislukt: {e}"], {}
+        print(f"Tail check {subject!r}: ok={tail_ok} {tail_metrics} {tail_problems}")
+        if not tail_ok:
+            try:
+                with open(os.path.join(BASE_DIR, "automation", "blocked_videos.log"), "a") as bf:
+                    bf.write(f"{datetime.now(timezone.utc).isoformat()} | {item['task_id']} | {subject!r} | "
+                             f"{tail_problems} | {video_path}\n")
+            except OSError:
+                pass
+            notify_macos("Nognize", f"Video niet geüpload: einde afgekapt ({subject[:40]})", sound="Basso")
+            continue
+
         log_entry = {
             "task_id": item["task_id"],
             "subject": subject,
@@ -875,6 +941,9 @@ def main():
         category, hook_type = classify_video(subject, title)
         log_entry["category"] = category
         log_entry["hook_type"] = hook_type
+        # First sentence of the script, so later analysis can compare actual
+        # openers against retention instead of only the title-based hook_type.
+        log_entry["opening_line"] = (script or "").strip().split(". ")[0][:160]
         caption = meta.get("caption") or script
         hashtags_list = meta.get("hashtags") or []
         hashtags = " ".join(hashtags_list)
@@ -926,36 +995,46 @@ def main():
 
         meta_variant_path = create_meta_variant(video_path)
 
-        try:
-            fb_result = meta_api.upload_facebook_video(
-                video_path=meta_variant_path,
-                title=title,
-                description=description,
-                scheduled_publish_time=int(slot_dt.timestamp()),
-            )
-            state["last_scheduled_utc"] = candidate_scheduled_utc
-            print(f"Facebook scheduled: {fb_result.get('id')} at {candidate_scheduled_utc}")
-            log_entry["platforms"]["facebook"] = {
-                "id": fb_result.get("id"),
-                "status": "scheduled",
-                "scheduled_for": candidate_scheduled_utc,
-            }
-        except Exception as e:
-            print(f"Facebook upload failed for {subject}: {e}")
-            log_entry["platforms"]["facebook"] = {"status": "failed", "error": str(e)}
+        if FACEBOOK_ENABLED:
+            try:
+                fb_result = meta_api.upload_facebook_video(
+                    video_path=meta_variant_path,
+                    title=title,
+                    description=description,
+                    scheduled_publish_time=int(slot_dt.timestamp()),
+                )
+                state["last_scheduled_utc"] = candidate_scheduled_utc
+                print(f"Facebook scheduled: {fb_result.get('id')} at {candidate_scheduled_utc}")
+                log_entry["platforms"]["facebook"] = {
+                    "id": fb_result.get("id"),
+                    "status": "scheduled",
+                    "scheduled_for": candidate_scheduled_utc,
+                }
+            except Exception as e:
+                print(f"Facebook upload failed for {subject}: {e}")
+                log_entry["platforms"]["facebook"] = {"status": "failed", "error": str(e)}
 
         save_state(state)
 
-        try:
+        if os.getenv("INSTAGRAM_MODE", "slot").strip().lower() == "slot":
             # Instagram's API has no native "schedule for later" (unlike
-            # YouTube/Facebook), so it publishes immediately at generation
-            # time rather than waiting for the 13:00/20:00 slot.
-            ig_result = instagram_api.upload_reel_via_url(video_path=meta_variant_path, caption=description)
-            print(f"Instagram published: {ig_result.get('id')}")
-            log_entry["platforms"]["instagram"] = {"id": ig_result.get("id"), "status": "live"}
-        except Exception as e:
-            print(f"Instagram upload failed for {subject}: {e}")
-            log_entry["platforms"]["instagram"] = {"status": "failed", "error": str(e)}
+            # YouTube/Facebook), so the post is parked here and published at the
+            # same slot as YouTube/Facebook by automation/instagram_slot_publisher.py
+            # (launchd, every 10 minutes). INSTAGRAM_MODE=immediate restores the
+            # old behaviour of publishing right now, in a burst with the others.
+            log_entry["platforms"]["instagram"] = {
+                "status": "pending_slot",
+                "scheduled_for": candidate_scheduled_utc,
+            }
+            print(f"Instagram parked for slot {candidate_scheduled_utc}")
+        else:
+            try:
+                ig_result = instagram_api.upload_reel_via_url(video_path=meta_variant_path, caption=description)
+                print(f"Instagram published: {ig_result.get('id')}")
+                log_entry["platforms"]["instagram"] = {"id": ig_result.get("id"), "status": "live"}
+            except Exception as e:
+                print(f"Instagram upload failed for {subject}: {e}")
+                log_entry["platforms"]["instagram"] = {"status": "failed", "error": str(e)}
 
         if meta_variant_path != video_path and os.path.exists(meta_variant_path):
             os.remove(meta_variant_path)
@@ -1064,6 +1143,23 @@ def main():
         cleanup_storage_main(argv=[])
     except Exception as e:
         print(f"Storage cleanup failed (non-fatal): {e}")
+
+    try:
+        # Fresh YouTube/Instagram/Facebook numbers (and learnings.md) before the feed is built, so the
+        # feed's "dataAsOf" is today instead of the last manual analysis run. Once a day on purpose:
+        # Instagram insights cost one API call per video. Never fatal.
+        from automation.analyze_performance import main as refresh_platform_stats
+        refresh_platform_stats()
+    except Exception as e:
+        print(f"Platform stats refresh failed (non-fatal): {e}")
+
+    try:
+        # Sanitised status feed (no captions/paths/tokens) pushed to the
+        # `status-feed` branch for the Agent Kantoor dashboard. Never fatal.
+        from automation.export_status import export_and_push
+        export_and_push()
+    except Exception as e:
+        print(f"Status feed export failed (non-fatal): {e}")
 
 
 if __name__ == "__main__":
