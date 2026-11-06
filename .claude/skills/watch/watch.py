@@ -10,6 +10,7 @@ import json
 import re
 import subprocess
 import sys
+import time
 import urllib.request
 from pathlib import Path
 
@@ -36,8 +37,17 @@ def fetch_instagram(url, out):
 
 
 def fetch_other(url, out):
-    subprocess.run(["yt-dlp", "-q", "--no-warnings", "-o", str(out / "reel.%(ext)s"), "-f", "mp4/best", url], check=True)
-    vid = next(out.glob("reel.*"))
+    cmd = ["yt-dlp", "-q", "--no-warnings", "--write-info-json", "-o", str(out / "reel.%(ext)s"), url]
+    for attempt in range(3):  # Instagram geeft af en toe een tijdelijke 429
+        if subprocess.run(cmd).returncode == 0:
+            break
+        time.sleep(5 * (attempt + 1))
+    else:
+        raise RuntimeError("yt-dlp mislukt na 3 pogingen (privé, geblokkeerd, of rate limit)")
+    info = out / "reel.info.json"
+    if info.exists():
+        (out / "caption.txt").write_text(json.load(open(info)).get("description") or "")
+    vid = next(f for f in out.glob("reel.*") if f.suffix in (".mp4", ".mkv", ".webm", ".mov"))
     if vid.name != "reel.mp4":
         vid.rename(out / "reel.mp4")
 
@@ -66,7 +76,14 @@ def frames(video, out):
 def main():
     url, out = sys.argv[1], Path(sys.argv[2])
     out.mkdir(parents=True, exist_ok=True)
-    (fetch_instagram if "instagram.com" in url else fetch_other)(url, out)
+    if "instagram.com" in url:
+        try:
+            fetch_instagram(url, out)
+        except Exception as e:  # embed geeft soms geen video_url: val terug op yt-dlp
+            print(f"embed mislukt ({e}); yt-dlp proberen", file=sys.stderr)
+            fetch_other(url, out)
+    else:
+        fetch_other(url, out)
     video = out / "reel.mp4"
     dur = frames(video, out)
     (out / "transcript.txt").write_text(transcribe(video, out))
