@@ -1,0 +1,153 @@
+"""Schrijft een opgeschoonde statusfeed (geen bijschriften, geen paden, geen tokens) en zet die op de
+GitHub-branch `status-feed`, zonder je werkmap of je index aan te raken.
+
+Gebruik (aan het eind van daily_pipeline.main, niet-fataal):
+    from automation.export_status import export_and_push
+    export_and_push()
+"""
+import base64
+import json
+import os
+import subprocess
+import sys
+import tempfile
+from datetime import datetime, timezone
+from typing import Optional
+
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if BASE_DIR not in sys.path:
+    sys.path.insert(0, BASE_DIR)  # nodig als dit script los wordt gestart (python3 automation/export_status.py)
+POST_LOG_FILE = os.path.join(BASE_DIR, "automation", "post_log.json")
+OUT_FILE = os.path.join(BASE_DIR, "automation", "public_status.json")
+TIKTOK_FOLLOWERS_FILE = os.path.join(BASE_DIR, "automation", "tiktok_followers.json")
+# Vaste identiteit voor de feed-commits, zodat ze niet de git-identiteit van de Mac dragen.
+# Dit is alleen een label: het maakt een commit niet "Verified" (daar is een handtekening voor nodig).
+FEED_COMMIT_ENV = {
+    "GIT_AUTHOR_NAME": "Claude", "GIT_AUTHOR_EMAIL": "noreply@anthropic.com",
+    "GIT_COMMITTER_NAME": "Claude", "GIT_COMMITTER_EMAIL": "noreply@anthropic.com",
+}
+KEYS = {"youtube": "y", "tiktok": "t", "instagram": "i", "facebook": "f"}
+STAT = {"live": "l", "scheduled": "s", "pending_manual": "p", "private": "v"}
+
+
+def thumbnail(video_path: str, width: int = 150) -> str:
+    """Eerste bruikbare beeld van de video als kleine JPEG (data-URI). Leeg als het niet lukt."""
+    if not video_path or not os.path.exists(video_path):
+        return ""
+    try:
+        with tempfile.TemporaryDirectory() as d:
+            out = os.path.join(d, "t.jpg")
+            subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-ss", "1.0", "-i", video_path, "-frames:v", "1",
+                            "-vf", f"scale={width}:-2", "-q:v", "9", out], check=True, timeout=60)
+            with open(out, "rb") as f:
+                return "data:image/jpeg;base64," + base64.b64encode(f.read()).decode()
+    except Exception:
+        return ""
+
+
+def collect_channel() -> dict:
+    """Kanaalcijfers die echt uit een bron komen. Wat ontbreekt of faalt wordt weggelaten, nooit geschat.
+
+    YouTube: abonnees en kijkuren (365 d) uit de YouTube API (alleen als het token aanwezig is).
+    TikTok: volgers uit tiktok_followers.json, met het tijdstip van die meting (kan oud zijn).
+    Geen tokens, kanaal-id's of paden.
+    """
+    channel = {}
+    yt = {}
+    try:
+        from app.services import youtube_api
+        stats = youtube_api.get_channel_stats()
+        if stats.get("subscriberCount") is not None:
+            yt["subscribers"] = int(stats["subscriberCount"])
+        try:
+            yt["watchHours365"] = round(float(youtube_api.get_watch_minutes(365)) / 60, 1)
+        except Exception:
+            pass
+    except Exception:
+        pass
+    if yt:
+        channel["youtube"] = yt
+    try:
+        with open(TIKTOK_FOLLOWERS_FILE) as f:
+            data = json.load(f)
+        if data.get("followers") is not None:
+            tt = {"followers": int(data["followers"])}
+            if data.get("updated_at"):
+                tt["asOf"] = str(data["updated_at"])
+            channel["tiktok"] = tt
+    except Exception:
+        pass
+    if channel:
+        channel["asOf"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    return channel
+
+
+def build_feed(post_log: list, channel: Optional[dict] = None) -> dict:
+    items = []
+    data_as_of = ""
+    totals = {k: {"views": 0, "likes": 0, "comments": 0, "videos": 0, "live": 0} for k in KEYS}
+    for e in post_log:
+        p = {}
+        for name, v in (e.get("platforms") or {}).items():
+            if name not in KEYS:
+                continue
+            status = v.get("status")
+            data_as_of = max(data_as_of, (v.get("stats_fetched_at") or "")[:10])
+            p[KEYS[name]] = [STAT.get(status, "x"), v.get("views") or 0, v.get("likes") or 0, v.get("comments") or 0]
+            t = totals[name]
+            t["videos"] += 1
+            if status == "live":
+                t["live"] += 1
+                t["views"] += v.get("views") or 0
+                t["likes"] += v.get("likes") or 0
+                t["comments"] += v.get("comments") or 0
+        items.append({"t": (e.get("title") or "")[:90], "s": (e.get("subject") or "")[:140], "d": (e.get("posted_at") or "")[:10], "p": p, "_v": e.get("video_path") or ""})
+    items.sort(key=lambda x: x["d"], reverse=True)
+    for it in items[:3]:  # alleen de 3 nieuwste krijgen een foto (klein, ~5 KB per stuk)
+        it["img"] = thumbnail(it["_v"])
+    for it in items:
+        it.pop("_v", None)
+        if not it.get("img"):
+            it.pop("img", None)
+    feed = {"asOf": datetime.now(timezone.utc).isoformat(timespec="seconds"), "dataAsOf": data_as_of, "platforms": totals, "items": items}
+    if channel:
+        feed["channel"] = channel
+    return feed
+
+
+def _git(*args, input=None, env=None):
+    try:
+        return subprocess.run(["git", "-C", BASE_DIR, *args], input=input, capture_output=True, text=True, check=True,
+                              env=env).stdout.strip()
+    except subprocess.CalledProcessError as e:
+        # CalledProcessError's str() omits stderr, so a failing push logged only "exit status 128"
+        # with no cause (seen 9x in pipeline.error.log). Surface git's own message.
+        detail = (e.stderr or "").strip().splitlines()
+        raise RuntimeError(f"git {args[0]} exit {e.returncode}: {detail[-1] if detail else 'no stderr'}") from e
+
+
+def push_feed(path: str, remote: str = "origin", branch: str = "status-feed"):
+    """Plumbing: blob -> tree -> commit zonder ouder -> force-push. Raakt werkmap en index niet."""
+    blob = _git("hash-object", "-w", path)
+    tree = _git("mktree", input=f"100644 blob {blob}\tpublic_status.json\n")
+    commit = _git("commit-tree", tree, "-m", f"status feed {datetime.now(timezone.utc).isoformat(timespec='seconds')}",
+                  env={**os.environ, **FEED_COMMIT_ENV})
+    _git("push", "--force", remote, f"{commit}:refs/heads/{branch}")
+
+
+def export_and_push(remote: str = "origin"):
+    try:
+        with open(POST_LOG_FILE) as f:
+            feed = build_feed(json.load(f), collect_channel())
+        tmp = OUT_FILE + ".tmp"
+        with open(tmp, "w") as f:
+            json.dump(feed, f, ensure_ascii=False, separators=(",", ":"))
+        os.replace(tmp, OUT_FILE)
+        push_feed(OUT_FILE, remote)
+        print(f"Statusfeed bijgewerkt ({len(feed['items'])} video's)")
+    except Exception as e:  # nooit de pipeline breken
+        print(f"Statusfeed mislukt (niet fataal): {e}", file=sys.stderr)
+
+
+if __name__ == "__main__":
+    export_and_push(*(sys.argv[1:2]))
