@@ -68,7 +68,8 @@ automation/portfolio_output/
 automation/portfolio_projects/
 
 # Claude Code's own local tool config/worktrees -- not project source.
-.claude/
+.claude/*
+!.claude/skills/
 
 # graphify's generated knowledge-graph output -- regenerated weekly by the
 # graphify-weekly-update task, not worth committing every week.
@@ -79,3 +80,5 @@ hyperframes_project/out/
 
 # Timestamped safety copies written by update_tiktok_stats.py --apply
 automation/post_log.backup-*.json
+automation/public_status.json
+automation/public_status.json.tmp
