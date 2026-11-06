@@ -377,28 +377,15 @@ def correct(subtitle_file, video_script, words: list | None = None):
             script_index += 1
             subtitle_index = next_subtitle_index
 
-    # Process the remaining lines of the script.
-    while script_index < len(script_lines):
-        logger.warning(f"Extra script line: {script_lines[script_index]}")
-        if subtitle_index < len(subtitle_items):
-            new_subtitle_items.append(
-                (
-                    len(new_subtitle_items) + 1,
-                    subtitle_items[subtitle_index][1],
-                    script_lines[script_index],
-                )
-            )
-            subtitle_index += 1
-        else:
-            new_subtitle_items.append(
-                (
-                    len(new_subtitle_items) + 1,
-                    "00:00:00,000 --> 00:00:00,000",
-                    script_lines[script_index],
-                )
-            )
-        script_index += 1
-        corrected = True
+    if script_index < len(script_lines):
+        # Mirrors upstream b42ecbc: the transcription has no timing left for
+        # these script lines. Keep its original cues rather than publishing a
+        # partially aligned result followed by zero-length captions.
+        logger.warning(
+            "Subtitle correction ran out of timed cues; "
+            "preserving the original transcription"
+        )
+        return
 
     if corrected and not new_subtitle_items:
         # Mirrors upstream e053af0: never replace a transcript with a cue-less file.

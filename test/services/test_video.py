@@ -668,6 +668,29 @@ class TestVideoService(unittest.TestCase):
                 "C:/Users/Test User'\\''s Videos/clip.mp4",
             )
 
+    def test_concat_video_clips_never_reads_the_console(self):
+        """Mirrors upstream c8dbf96: FFmpeg must not read keys from the console."""
+
+        def fake_run(command, capture_output, text, check, **kwargs):
+            Path(command[-1]).write_bytes(b"encoded-video")
+            return types.SimpleNamespace(returncode=0, stdout="", stderr="")
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            clip_file = os.path.join(temp_dir, "clip.mp4")
+            output_file = os.path.join(temp_dir, "combined.mp4")
+            Path(clip_file).write_bytes(b"fake")
+
+            with patch.object(vd.subprocess, "run", side_effect=fake_run) as run:
+                vd.concat_video_clips_with_ffmpeg(
+                    clip_files=[clip_file],
+                    output_file=output_file,
+                    threads=1,
+                    output_dir=temp_dir,
+                )
+
+        command = run.call_args.args[0]
+        self.assertIn("-nostdin", command[: command.index("-i")])
+
     def test_concat_video_clips_falls_back_after_runtime_encoder_failure(self):
         """
         最终 ffmpeg concat 阶段也要具备同样的回退能力。这里用 mock 模拟
@@ -922,7 +945,7 @@ class TestVideoService(unittest.TestCase):
 
         source_ranges, written_durations = self._capture_source_ranges_for_clip_speed(
             source_duration=4.0,
-            audio_duration=5.9,
+            audio_duration=5.5,  # +0.4 s staart-stilte = zelfde 6,0 s doel als voorheen
             clip_speed=0.5,
         )
 
@@ -934,7 +957,7 @@ class TestVideoService(unittest.TestCase):
 
         source_ranges, written_durations = self._capture_source_ranges_for_clip_speed(
             source_duration=8.0,
-            audio_duration=2.9,
+            audio_duration=2.5,  # +0.4 s staart-stilte = zelfde 3,0 s doel als voorheen
             clip_speed=2.0,
         )
 
@@ -1000,7 +1023,7 @@ class TestVideoService(unittest.TestCase):
 
         self.assertEqual(result, combined_video_path)
         self.assertEqual(write_mock.call_count, 4)
-        self.assertEqual(concat_mock.call_args.kwargs["max_duration"], 10.0)
+        self.assertEqual(concat_mock.call_args.kwargs["max_duration"], 10.0 + vd._FINAL_TAIL_PADDING_SECONDS)
 
     def test_concat_video_clips_limits_output_to_audio_duration(self):
         """最终拼接时应裁到音频时长，避免安全余量带来明显静音尾巴。"""
