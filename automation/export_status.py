@@ -116,8 +116,14 @@ def build_feed(post_log: list, channel: Optional[dict] = None) -> dict:
 
 
 def _git(*args, input=None, env=None):
-    return subprocess.run(["git", "-C", BASE_DIR, *args], input=input, capture_output=True, text=True, check=True,
-                          env=env).stdout.strip()
+    try:
+        return subprocess.run(["git", "-C", BASE_DIR, *args], input=input, capture_output=True, text=True, check=True,
+                              env=env).stdout.strip()
+    except subprocess.CalledProcessError as e:
+        # CalledProcessError's str() omits stderr, so a failing push logged only "exit status 128"
+        # with no cause (seen 9x in pipeline.error.log). Surface git's own message.
+        detail = (e.stderr or "").strip().splitlines()
+        raise RuntimeError(f"git {args[0]} exit {e.returncode}: {detail[-1] if detail else 'no stderr'}") from e
 
 
 def push_feed(path: str, remote: str = "origin", branch: str = "status-feed"):
