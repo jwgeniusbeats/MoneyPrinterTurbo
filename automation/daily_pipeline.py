@@ -706,6 +706,12 @@ def generate_new_topics(n: int, learnings: str, existing: list, inspiration: str
         "sticks in memory), with the named phenomenon as the explanation. Our best performers on "
         "this channel are exactly this. Avoid broad, overcrowded themes such as imposter "
         "syndrome, placebo, or generic self-improvement; they got near-zero views here."
+        "\n\nExperiment: roughly 1 in 3 topics should instead be about reading other people "
+        "(body language, spotting a lie, what someone really wants, social dynamics), phrased as "
+        "'How to tell if ...' or '3 signs ...' so the title starts with 'How to' or a number. "
+        "6 of our 12 best videos are about other people, not about the viewer's own brain. "
+        "Keep the other 2 in 3 as the recognisable-sensation psychology topics above, and do "
+        "not mix the two styles within one topic."
         + f"\n\nReply with exactly {n} lines, one topic per line, no numbering, no extra text."
     )
     # No str.format() over the assembled prompt: it embeds topics, learnings and

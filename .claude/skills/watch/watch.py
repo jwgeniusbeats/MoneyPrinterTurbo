@@ -56,6 +56,10 @@ def transcribe(video, out):
     import numpy as np
     from faster_whisper import WhisperModel
 
+    has_audio = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "a", "-show_entries", "stream=index",
+                                "-of", "csv=p=0", str(video)], capture_output=True, text=True).stdout.strip()
+    if not has_audio:  # stille video (bv. nieuws-slideshow): ffmpeg zou crashen, caption heeft de inhoud
+        return "(geen audiospoor)"
     raw = subprocess.run(["ffmpeg", "-v", "error", "-i", str(video), "-f", "f32le", "-ac", "1", "-ar", "16000", "-"],
                          capture_output=True, check=True).stdout
     if not raw:
