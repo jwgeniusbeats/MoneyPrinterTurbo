@@ -82,3 +82,5 @@ hyperframes_project/out/
 automation/post_log.backup-*.json
 automation/public_status.json
 automation/public_status.json.tmp
+
+automation/paper_desk/data/
