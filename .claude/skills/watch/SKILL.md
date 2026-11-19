@@ -7,7 +7,7 @@ description: Bekijk en beluister een video-link (Instagram reel/post, of andere 
 
 1. Eenmalig: `pip install -q faster-whisper yt-dlp` (ffmpeg moet er zijn).
 2. Run: `python3 .claude/skills/watch/watch.py "<link>" <scratchpad>/watch-<id>`
-3. Lees `caption.txt` en `transcript.txt`; bekijk `frames.jpg` met Read (tekst op scherm, namen, cijfers).
+3. Lees `caption.txt` en `transcript.txt`; bekijk `frames.jpg` en bij carrousels `slides.jpg` (alle slides; de caption alleen is niet genoeg) met Read (tekst op scherm, namen, cijfers).
    Transcript kan namen verkeerd horen: controleer ze tegen de beelden.
 4. Antwoord in vaste vorm, kort:
    - **Claim:** wat wordt beweerd of verkocht.

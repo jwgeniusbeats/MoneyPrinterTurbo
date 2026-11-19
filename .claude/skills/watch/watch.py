@@ -21,19 +21,39 @@ def http(url):
     return urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": UA}), timeout=60)
 
 
+def fetch_slides(page, out):
+    """Carrousel: haal alle slide-afbeeldingen uit de embed en maak een contactsheet (slides.jpg)."""
+    i = page.find("edge_sidecar_to_children")
+    if i < 0:
+        return 0
+    urls = []
+    for m in re.finditer(r'\\"display_url\\":\\"(.*?)\\"', page[i:i + 60000]):
+        u = json.loads('"' + m.group(1) + '"').replace("\\/", "/")
+        if u not in urls:
+            urls.append(u)
+    for n, u in enumerate(urls, 1):
+        (out / f"slide{n}.jpg").write_bytes(http(u).read())
+    if urls:
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-framerate", "1", "-i", str(out / "slide%d.jpg"),
+                        "-vf", f"scale=720:900,tile={min(3, len(urls))}x{-(-len(urls) // 3)}",
+                        "-frames:v", "1", str(out / "slides.jpg")], check=True)
+    return len(urls)
+
+
 def fetch_instagram(url, out):
     m = re.search(r"instagram\.com/(?:[\w.]+/)?(reel|reels|p|tv)/([\w-]+)", url)
     if not m:
         raise RuntimeError("geen geldige Instagram-link")
     page = http(f"https://www.instagram.com/{m.group(1).rstrip('s')}/{m.group(2)}/embed/captioned/").read().decode("utf8", "replace")
+    slides = fetch_slides(page, out)
     v = re.search(r'video_url\\":\\"(.*?)\\"', page)
-    if not v:
+    if not v and not slides:
         raise RuntimeError("geen video_url in embed (privé, geblokkeerd, of fotopost)")
-    video = json.loads('"' + v.group(1) + '"').replace("\\/", "/")
     c = re.search(r'class="Caption">(.*?)<div class="CaptionComments"', page, re.S)
     caption = html.unescape(re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", c.group(1)))).strip() if c else ""
-    (out / "reel.mp4").write_bytes(http(video).read())
     (out / "caption.txt").write_text(caption)
+    if v:
+        (out / "reel.mp4").write_bytes(http(json.loads('"' + v.group(1) + '"').replace("\\/", "/")).read())
 
 
 def fetch_other(url, out):
@@ -89,11 +109,15 @@ def main():
     else:
         fetch_other(url, out)
     video = out / "reel.mp4"
-    dur = frames(video, out)
-    (out / "transcript.txt").write_text(transcribe(video, out))
-    print(f"klaar: {dur:.0f}s video in {out}")
-    for f in ("caption.txt", "transcript.txt", "frames.jpg"):
-        print(" -", out / f)
+    if video.exists():
+        dur = frames(video, out)
+        (out / "transcript.txt").write_text(transcribe(video, out))
+        print(f"klaar: {dur:.0f}s video in {out}")
+    else:
+        print(f"klaar: fotocarrousel in {out}")
+    for f in ("caption.txt", "transcript.txt", "frames.jpg", "slides.jpg"):
+        if (out / f).exists():
+            print(" -", out / f)
 
 
 if __name__ == "__main__":
