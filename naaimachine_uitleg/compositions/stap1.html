@@ -1,0 +1,30 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; background: #f3eadb; font-family: Poppins, sans-serif; color: #2a2622; }
+    #root .hd { position: absolute; left: 156px; top: 300px; width: 768px; }
+    #root .chip { font-size: 30px; letter-spacing: 0.14em; font-weight: 700; color: #e4572e; }
+    #root .ttl { font-size: 84px; line-height: 1.02; font-weight: 700; margin-top: 6px; }
+    #root .card { position: absolute; left: 156px; top: 470px; width: 768px; height: 620px; border: 6px solid #2a2622; border-radius: 24px; background: #fff; overflow: hidden; }
+    #root .fig { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+    #root .fig img { display: block; }
+    #root .fig.fit img { max-width: 100%; max-height: 100%; }
+    #root .fig.pan { align-items: flex-start; }
+    #root .fig.pan img { width: 100%; height: auto; }
+    #root .cap { position: absolute; left: 156px; top: 1110px; width: 768px; font-size: 48px; line-height: 1.2; font-weight: 700; }
+  </style>
+  <div id="root" data-composition-id="stap1" data-width="1080" data-height="1920">
+    <div class="hd"><div class="chip">STAP 1 VAN 7</div><div class="ttl">Klaarzetten</div></div>
+    <div class="card">
+    <div class="fig fit clip" id="s1-f1" data-start="0.5" data-duration="4.5"><img id="s1-i1" src="assets/fig_p3_stekker.png" /></div>
+    <div class="fig fit clip" id="s1-f2" data-start="5.0" data-duration="4.5"><img id="s1-i2" src="assets/fig_p3_pedaal.png" /></div>
+    </div>
+    <div class="cap clip" id="s1-c1" data-start="0.5" data-duration="4.5">Stekker in de machine. Dan in het stopcontact.</div>
+    <div class="cap clip" id="s1-c2" data-start="5.0" data-duration="4.5">Pedaal op de grond. Trap erop: hoe harder, hoe sneller.</div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    tl.fromTo("#s1-i1", { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.4, ease: "power2.out" }, 0.5);
+    tl.fromTo("#s1-i2", { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.4, ease: "power2.out" }, 5.0);
+    window.__timelines["stap1"] = tl;
+  </script>
+</template>

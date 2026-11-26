@@ -1,0 +1,60 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; background: #f3eadb; font-family: Poppins, sans-serif; color: #2a2622; }
+    #root .hd { position: absolute; left: 156px; top: 300px; width: 768px; }
+    #root .chip { font-size: 30px; letter-spacing: 0.14em; font-weight: 700; color: #e4572e; }
+    #root .ttl { font-size: 84px; line-height: 1.02; font-weight: 700; margin-top: 6px; }
+    #root .card { position: absolute; left: 156px; top: 470px; width: 768px; height: 620px; border: 6px solid #2a2622; border-radius: 24px; background: #fff; overflow: hidden; }
+    #root .fig { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+    #root .fig img { display: block; }
+    #root .fig.fit img { max-width: 100%; max-height: 100%; }
+    #root .fig.pan { align-items: flex-start; }
+    #root .fig.pan img { width: 100%; height: auto; }
+    #root .cap { position: absolute; left: 156px; top: 1110px; width: 768px; font-size: 48px; line-height: 1.2; font-weight: 700; }
+  </style>
+  <div id="root" data-composition-id="stap2" data-width="1080" data-height="1920">
+    <div class="hd"><div class="chip">STAP 2 VAN 7</div><div class="ttl">Spoel opwinden</div></div>
+    <div class="card">
+    <div class="fig fit clip" id="s2-f1" data-start="0.5" data-duration="4"><img id="s2-i1" src="assets/fig_p4_1.png" /></div>
+    <div class="fig fit clip" id="s2-f2" data-start="4.5" data-duration="3.5"><img id="s2-i2" src="assets/fig_p4_2.png" /></div>
+    <div class="fig fit clip" id="s2-f3" data-start="8.0" data-duration="4"><img id="s2-i3" src="assets/fig_p4_3.png" /></div>
+    <div class="fig fit clip" id="s2-f4" data-start="12.0" data-duration="4"><img id="s2-i4" src="assets/fig_p4_4.png" /></div>
+    <div class="fig fit clip" id="s2-f5" data-start="16.0" data-duration="4"><img id="s2-i5" src="assets/fig_p5_1.png" /></div>
+    <div class="fig fit clip" id="s2-f6" data-start="20.0" data-duration="4"><img id="s2-i6" src="assets/fig_p5_2.png" /></div>
+    <div class="fig fit clip" id="s2-f7" data-start="24.0" data-duration="4.5"><img id="s2-i7" src="assets/fig_p5_3.png" /></div>
+    <div class="fig fit clip" id="s2-f8" data-start="28.5" data-duration="3.5"><img id="s2-i8" src="assets/fig_p5_4.png" /></div>
+    <div class="fig fit clip" id="s2-f9" data-start="32.0" data-duration="5"><img id="s2-i9" src="assets/fig_p6_top.png" /></div>
+    <div class="fig fit clip" id="s2-f10" data-start="37.0" data-duration="4"><img id="s2-i10" src="assets/fig_p3_pedaal.png" /></div>
+    <div class="fig fit clip" id="s2-f11" data-start="41.0" data-duration="5"><img id="s2-i11" src="assets/fig_p5_2.png" /></div>
+    <div class="fig fit clip" id="s2-f12" data-start="46.0" data-duration="5"><img id="s2-i12" src="assets/fig_p7_top.png" /></div>
+    </div>
+    <div class="cap clip" id="s2-c1" data-start="0.5" data-duration="4">Til de accessoirebox op en haal hem weg.</div>
+    <div class="cap clip" id="s2-c2" data-start="4.5" data-duration="3.5">Open het klepje.</div>
+    <div class="cap clip" id="s2-c3" data-start="8.0" data-duration="4">Pak het spoelhuis. Trek het eruit.</div>
+    <div class="cap clip" id="s2-c4" data-start="12.0" data-duration="4">Laat het lipje los. De spoel valt eruit.</div>
+    <div class="cap clip" id="s2-c5" data-start="16.0" data-duration="4">Zet de lege spoel op de spoelas.</div>
+    <div class="cap clip" id="s2-c6" data-start="20.0" data-duration="4">Duw de spoel naar rechts tot hij stopt.</div>
+    <div class="cap clip" id="s2-c7" data-start="24.0" data-duration="4.5">Pak het handwiel vast. Draai de knop naar je toe.</div>
+    <div class="cap clip" id="s2-c8" data-start="28.5" data-duration="3.5">Zet de klos op de garenpen.</div>
+    <div class="cap clip" id="s2-c9" data-start="32.0" data-duration="5">Draad langs het schijfje naar de spoel. Een paar rondjes.</div>
+    <div class="cap clip" id="s2-c10" data-start="37.0" data-duration="4">Trap op het pedaal. De spoel wordt vol.</div>
+    <div class="cap clip" id="s2-c11" data-start="41.0" data-duration="5">Vol? Duw naar links, spoel eraf, knip de draad.</div>
+    <div class="cap clip" id="s2-c12" data-start="46.0" data-duration="5">Handwiel vast. Knop van je af. Wiel naar je toe tot het klikt.</div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    tl.fromTo("#s2-i1", { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.4, ease: "power2.out" }, 0.5);
+    tl.fromTo("#s2-i2", { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.4, ease: "power2.out" }, 4.5);
+    tl.fromTo("#s2-i3", { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.4, ease: "power2.out" }, 8.0);
+    tl.fromTo("#s2-i4", { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.4, ease: "power2.out" }, 12.0);
+    tl.fromTo("#s2-i5", { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.4, ease: "power2.out" }, 16.0);
+    tl.fromTo("#s2-i6", { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.4, ease: "power2.out" }, 20.0);
+    tl.fromTo("#s2-i7", { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.4, ease: "power2.out" }, 24.0);
+    tl.fromTo("#s2-i8", { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.4, ease: "power2.out" }, 28.5);
+    tl.fromTo("#s2-i9", { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.4, ease: "power2.out" }, 32.0);
+    tl.fromTo("#s2-i10", { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.4, ease: "power2.out" }, 37.0);
+    tl.fromTo("#s2-i11", { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.4, ease: "power2.out" }, 41.0);
+    tl.fromTo("#s2-i12", { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.4, ease: "power2.out" }, 46.0);
+    window.__timelines["stap2"] = tl;
+  </script>
+</template>
