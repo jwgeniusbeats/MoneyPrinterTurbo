@@ -1,0 +1,5 @@
+# Bewust niet in git (publieke repo): Pfaff-handleidingtekeningen, privefoto's, renders
+assets/
+renders/
+snapshots/
+render.log
