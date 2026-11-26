@@ -10,13 +10,24 @@
     </style>
   </head>
   <body>
-    <div id="root" data-composition-id="main" data-start="0" data-duration="50" data-width="1080" data-height="1920">
+    <div id="root" data-composition-id="main" data-start="0" data-duration="69" data-width="1080" data-height="1920">
+      <div id="overzicht" data-composition-id="overzicht" data-composition-src="compositions/overzicht.html"
+        data-start="0" data-duration="7" data-track-index="1" data-track-kind="graphics" data-width="1080" data-height="1920"></div>
+      <div id="zoom-spoel" data-composition-id="zoom" data-composition-src="compositions/zoom.html"
+        data-variable-values='{"chip":"STAP 1 VAN 7","title":"Spoelwinder","cap":"Bovenop de machine, rechts","cx":775,"cy":135,"w":300}'
+        data-start="7" data-duration="4" data-track-index="1" data-track-kind="graphics" data-width="1080" data-height="1920"></div>
       <div id="spoel-opwinden" data-composition-id="spoel-opwinden" data-composition-src="compositions/spoel-opwinden.html"
-        data-start="0" data-duration="21" data-track-index="1" data-track-kind="graphics" data-width="1080" data-height="1920"></div>
+        data-start="11" data-duration="21" data-track-index="1" data-track-kind="graphics" data-width="1080" data-height="1920"></div>
+      <div id="zoom-klep" data-composition-id="zoom" data-composition-src="compositions/zoom.html"
+        data-variable-values='{"chip":"STAP 2 VAN 7","title":"Spoelhuis","cap":"Accessoirebox eraf: dan zie je het klepje","cx":330,"cy":520,"w":520}'
+        data-start="32" data-duration="4" data-track-index="1" data-track-kind="graphics" data-width="1080" data-height="1920"></div>
       <div id="spoel-inleggen" data-composition-id="spoel-inleggen" data-composition-src="compositions/spoel-inleggen.html"
-        data-start="21" data-duration="12" data-track-index="1" data-track-kind="graphics" data-width="1080" data-height="1920"></div>
+        data-start="36" data-duration="12" data-track-index="1" data-track-kind="graphics" data-width="1080" data-height="1920"></div>
+      <div id="zoom-draad" data-composition-id="zoom" data-composition-src="compositions/zoom.html"
+        data-variable-values='{"chip":"STAP 3 VAN 7","title":"Draadroute","cap":"Van de klos bovenop naar de naald links","cx":230,"cy":320,"w":480}'
+        data-start="48" data-duration="4" data-track-index="1" data-track-kind="graphics" data-width="1080" data-height="1920"></div>
       <div id="bovendraad" data-composition-id="bovendraad" data-composition-src="compositions/bovendraad.html"
-        data-start="33" data-duration="17" data-track-index="1" data-track-kind="graphics" data-width="1080" data-height="1920"></div>
+        data-start="52" data-duration="17" data-track-index="1" data-track-kind="graphics" data-width="1080" data-height="1920"></div>
     </div>
     <script>
       const tl = gsap.timeline({ paused: true });

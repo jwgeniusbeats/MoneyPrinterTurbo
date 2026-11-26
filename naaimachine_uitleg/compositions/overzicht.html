@@ -1,0 +1,33 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; background: #f3eadb; font-family: Poppins, sans-serif; color: #2a2622; }
+    #root .hd { position: absolute; left: 156px; top: 300px; width: 768px; }
+    #root .chip { font-size: 30px; letter-spacing: 0.14em; font-weight: 700; color: #e4572e; }
+    #root .ttl { font-size: 84px; line-height: 1.02; font-weight: 700; margin-top: 6px; }
+    #root .win { position: absolute; left: 156px; top: 470px; width: 768px; height: 620px; overflow: hidden; border-radius: 24px; border: 6px solid #2a2622; background: #2a2622; }
+    #root .win img { position: absolute; left: 0; top: 0; width: 1000px; height: 750px; }
+    #root .lab { position: absolute; font-size: 24px; font-weight: 700; color: #fff; background: #2a2622; padding: 4px 12px; border-radius: 999px; white-space: nowrap; }
+    #root .dot { position: absolute; width: 22px; height: 22px; margin: -11px 0 0 -11px; border-radius: 50%; background: #e4572e; border: 4px solid #fff; }
+    #root .cap { position: absolute; left: 156px; top: 1110px; width: 768px; font-size: 48px; line-height: 1.2; font-weight: 700; }
+  </style>
+  <div id="root" data-composition-id="overzicht" data-width="1080" data-height="1920">
+    <div class="hd"><div class="chip">DE MACHINE</div><div class="ttl">Dit zit waar</div></div>
+    <div class="win">
+      <img id="ov-img" src="assets/machine.jpg" />
+      <div id="ov-p1"><div class="dot" style="left:680px;top:224px"></div><div class="lab" style="left:560px;top:246px">handwiel</div></div>
+      <div id="ov-p2"><div class="dot" style="left:591px;top:109px"></div><div class="lab" style="left:360px;top:60px">garenpennen, spoelwinder</div></div>
+      <div id="ov-p4"><div class="dot" style="left:203px;top:370px"></div><div class="lab" style="left:240px;top:396px">naald en naaivoet</div></div>
+      <div id="ov-p5"><div class="dot" style="left:568px;top:285px"></div><div class="lab" style="left:470px;top:250px">steekkeuze</div></div>
+      <div id="ov-p6"><div class="dot" style="left:511px;top:431px"></div><div class="lab" style="left:420px;top:470px">steeklengte</div></div>
+    </div>
+    <div class="cap clip" data-start="0.8" data-duration="7">Dit zijn de onderdelen die we gaan gebruiken</div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    tl.fromTo("#ov-img", { opacity: 0 }, { opacity: 1, duration: 0.6 }, 0);
+    ["#ov-p1", "#ov-p2", "#ov-p4", "#ov-p5", "#ov-p6"].forEach((id, i) => {
+      tl.fromTo(id, { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: 0.4, ease: "power2.out" }, 1.2 + i * 0.7);
+    });
+    window.__timelines["overzicht"] = tl;
+  </script>
+</template>

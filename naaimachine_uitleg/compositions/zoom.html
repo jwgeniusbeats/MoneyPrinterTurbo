@@ -1,0 +1,28 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; background: #f3eadb; font-family: Poppins, sans-serif; color: #2a2622; }
+    #root .hd { position: absolute; left: 156px; top: 300px; width: 768px; }
+    #root .chip { font-size: 30px; letter-spacing: 0.14em; font-weight: 700; color: #e4572e; }
+    #root .ttl { font-size: 84px; line-height: 1.02; font-weight: 700; margin-top: 6px; }
+    #root .win { position: absolute; left: 156px; top: 470px; width: 768px; height: 620px; overflow: hidden; border-radius: 24px; border: 6px solid #2a2622; background: #2a2622; }
+    #root .win img { position: absolute; left: 0; top: 0; width: 1000px; height: 750px; }
+    #root .ring { position: absolute; left: 384px; top: 310px; width: 260px; height: 260px; margin: -130px 0 0 -130px; border-radius: 50%; border: 10px solid #e4572e; box-shadow: 0 0 0 2000px rgba(42,38,34,0.35); }
+    #root .cap { position: absolute; left: 156px; top: 1110px; width: 768px; font-size: 48px; line-height: 1.2; font-weight: 700; }
+  </style>
+  <div id="root" data-composition-id="zoom" data-width="1080" data-height="1920"
+    data-composition-variables='[{"id":"chip","type":"string","label":"Kopje","default":"STAP"},{"id":"title","type":"string","label":"Titel","default":"Titel"},{"id":"cap","type":"string","label":"Tekst","default":"Tekst"},{"id":"cx","type":"number","label":"Zoom x","default":500},{"id":"cy","type":"number","label":"Zoom y","default":375},{"id":"w","type":"number","label":"Zoom breedte","default":1000}]'>
+    <div class="hd"><div class="chip" id="z-chip" data-var-text="chip">STAP</div><div class="ttl" id="z-title" data-var-text="title">Titel</div></div>
+    <div class="win"><img id="z-img" src="assets/machine.jpg" /><div class="ring" id="z-ring"></div></div>
+    <div class="cap clip" id="z-cap" data-start="0.6" data-duration="3.4" data-var-text="cap">Tekst</div>
+  </div>
+  <script>
+    const v = (window.__hyperframes && window.__hyperframes.getVariables && window.__hyperframes.getVariables()) || {};
+    const cx = v.cx ?? 500, cy = v.cy ?? 375, w = v.w ?? 1000;
+    const k0 = 768 / 1000, x0 = 384 - 500 * k0, y0 = 310 - 375 * k0;
+    const k1 = 768 / w, x1 = 384 - cx * k1, y1 = 310 - cy * k1;
+    const tl = gsap.timeline({ paused: true });
+    tl.fromTo("#z-img", { x: x0, y: y0, scale: k0, transformOrigin: "0 0" }, { x: x1, y: y1, scale: k1, transformOrigin: "0 0", duration: 2.6, ease: "power2.inOut" }, 0.4);
+    tl.fromTo("#z-ring", { opacity: 0, scale: 1.4 }, { opacity: 1, scale: 1, duration: 0.5, ease: "power2.out" }, 3);
+    window.__timelines["zoom"] = tl;
+  </script>
+</template>
