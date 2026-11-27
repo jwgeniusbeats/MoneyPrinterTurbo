@@ -15,3 +15,8 @@
 
 ## Compact instructions
 Bij `/compact`: bewaar alleen openstaande taken, genomen beslissingen en gewijzigde bestanden.
+
+## Video-skills (`.claude/skills/`)
+- `ghost-editor`: alleen praatvideo's met spreker, draait op Mac. Niet voor onze faceless pipeline.
+- `short-form-video`, `kinetic-typography`, `caption-animation`, `chart-animation`, `animated-infographic`, `countdown-video`, `lower-thirds`, `presentation-video`: motion-graphics (iart-ai, MIT). Helperscripts staan in `_iart-scripts/`.
+- Effecten renderen: `hyperframes_project/` + `npx hyperframes@0.8.76 render -c compositions/<naam>.html`.
