@@ -1,31 +1,31 @@
 <template>
   <style>
-    #root { position: absolute; inset: 0; background: linear-gradient(170deg, #1b1310 0%, #2a1d17 60%, #1b1310 100%); font-family: Inter, sans-serif; color: #f5ece3; overflow: hidden; }
-    #root .orb { position: absolute; border-radius: 50%; background: radial-gradient(circle, rgba(201,160,116,0.55) 0%, rgba(201,160,116,0.18) 40%, rgba(201,160,116,0) 70%); }
-    #root .eyebrow { font-size: 30px; letter-spacing: 0.22em; font-weight: 700; color: #c9a074; text-transform: uppercase; }
-    #root .serif { font-family: 'Playfair Display', serif; font-weight: 700; line-height: 1.05; }
-    #root .serif em { font-style: italic; color: #d9b186; font-weight: 400; }
-    #root .logo { position: absolute; left: 150px; top: 380px; width: 300px; height: auto; }
-    #root .h { position: absolute; left: 150px; top: 760px; width: 780px; font-size: 118px; }
-    #root .rule { position: absolute; left: 150px; top: 1160px; width: 200px; height: 3px; background: #c9a074; }
-    #root .sub { position: absolute; left: 150px; top: 1195px; font-size: 40px; color: #e6d5c4; }
+    #root { position: absolute; inset: 0; font-family: Inter, sans-serif; overflow: hidden; }
+    #root.dark { background: #221a17; color: #f3ece2; }
+    #root.cream { background: linear-gradient(165deg, #f3ece2 0%, #e8e0d3 100%); color: #221a17; }
+    #root .logo { position: absolute; left: 150px; top: 305px; width: 190px; height: auto; }
+    #root .serif { font-family: 'EB Garamond', serif; font-weight: 400; line-height: 1.08; }
+    #root .rule { position: absolute; left: 150px; width: 90px; height: 2px; background: currentColor; opacity: 0.45; }
+    #root .foot { position: absolute; left: 150px; top: 1180px; width: 780px; display: flex; justify-content: space-between; align-items: center; font-size: 26px; letter-spacing: 0.04em; }
+    #root .foot span { opacity: 0.6; }
+    #root.dark .pill { background: #f3ece2; color: #221a17; } #root.cream .pill { background: #221a17; color: #f3ece2; }
+    #root .pill { font-size: 25px; font-weight: 600; padding: 12px 28px; border-radius: 999px; }
+    #root .sans { font-size: 36px; line-height: 1.35; opacity: 0.78; }
+    #root .h { position: absolute; left: 150px; top: 560px; width: 780px; font-size: 118px; }
   </style>
-  <div id="root" data-composition-id="belofte" data-width="1080" data-height="1920">
-    <div class="orb" id="bl-o1" style="left:100px;top:500px;width:900px;height:900px"></div>
-    <img class="logo" id="bl-logo" src="assets/logo_light.png" />
-    <div class="eyebrow clip" id="bl-eb" data-start="0.3" data-duration="4.2" style="position:absolute;left:150px;top:690px">Microhaar shading &middot; Utrecht</div>
-    <div class="serif h clip" id="bl-h" data-start="0.7" data-duration="3.8">Voller haar, helemaal <em>van jou.</em></div>
-    <div class="rule" id="bl-rule"></div>
-    <div class="sub clip" id="bl-sub" data-start="1.9" data-duration="2.6">Microhaar shading met Roos</div>
+  <div id="root" class="dark" data-composition-id="belofte" data-width="1080" data-height="1920">
+    <img class="logo" id="belofte-logo" src="assets/logo_light.png" />
+    <div class="serif h clip" id="belofte-h" data-start="0.5" data-duration="4.0">Voller haar, helemaal van jou.</div>
+    <div class="rule" id="belofte-rule" style="top:1000px"></div>
+    <div class="sans clip" id="belofte-sub" data-start="1.7" data-duration="2.8" style="position:absolute;left:150px;top:1040px">Microhaar shading door Roos</div>
+    <div class="foot clip" id="ft" data-start="0.6" data-duration="3.7"><span>NBL Glow &middot; Utrecht</span><div class=pill>@nbl_glow</div></div>
   </div>
   <script>
     const tl = gsap.timeline({ paused: true });
-    tl.fromTo("#bl-o1", { scale: 0.85, opacity: 0.4 }, { scale: 1.1, opacity: 1, duration: 4.5, ease: "sine.inOut" }, 0);
-    tl.fromTo("#bl-logo", { opacity: 0 }, { opacity: 1, duration: 0.7 }, 0);
-    tl.fromTo("#bl-eb", { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.6 }, 0.3);
-    tl.fromTo("#bl-h", { opacity: 0, y: 40 }, { opacity: 1, y: 0, duration: 0.9, ease: "power3.out" }, 0.7);
-    tl.fromTo("#bl-rule", { scaleX: 0, transformOrigin: "0 50%" }, { scaleX: 1, duration: 0.9, ease: "power2.out" }, 1.5);
-    tl.fromTo("#bl-sub", { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.6 }, 1.9);
+    tl.fromTo("#belofte-logo", { opacity: 0 }, { opacity: 1, duration: 0.7 }, 0);
+    tl.fromTo("#belofte-h", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.9, ease: "power3.out" }, 0.5);
+    tl.fromTo("#belofte-rule", { scaleX: 0, transformOrigin: "0 50%" }, { scaleX: 1, duration: 0.8, ease: "power2.out" }, 1.4);
+    tl.fromTo("#belofte-sub", { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: 0.6 }, 1.7);
     window.__timelines["belofte"] = tl;
   </script>
 </template>
