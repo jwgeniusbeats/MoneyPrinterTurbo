@@ -1,0 +1,27 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; font-family: Inter, sans-serif; overflow: hidden; }
+    #root.dark { background: #221a17; color: #f3ece2; }
+    #root.cream { background: linear-gradient(165deg, #f3ece2 0%, #e8e0d3 100%); color: #221a17; }
+    #root .logo { position: absolute; left: 150px; top: 305px; width: 190px; height: auto; }
+    #root .serif { font-family: 'EB Garamond', serif; font-weight: 400; line-height: 1.06; position: absolute; left: 150px; width: 780px; }
+    #root .rule { position: absolute; left: 150px; width: 90px; height: 2px; background: currentColor; opacity: 0.45; }
+    #root .sans { position: absolute; left: 150px; width: 780px; font-size: 38px; line-height: 1.35; opacity: 0.8; }
+    #root .foot { position: absolute; left: 150px; top: 1180px; width: 780px; display: flex; justify-content: space-between; align-items: center; font-size: 26px; letter-spacing: 0.04em; }
+    #root .foot span { opacity: 0.6; }
+    #root.dark .pill { background: #f3ece2; color: #221a17; } #root.cream .pill { background: #221a17; color: #f3ece2; }
+    #root .pill { font-size: 25px; font-weight: 600; padding: 12px 28px; border-radius: 999px; }
+  </style>
+  <div id="root" class="cream" data-composition-id="vraag" data-width="1080" data-height="1920">
+    <img class="logo" src="assets/logo_dark.png" />
+    <div class="serif clip" id="vraag-h" data-start="0" data-duration="4.5" style="top:480px;font-size:104px">Heb je dun haar of last van haarverlies?</div>
+    <div class="sans clip" id="vraag-s" data-start="1.0" data-duration="3.5" style="top:760px">Wij zoeken modellen voor microhaar shading.</div>
+    <div class="foot clip" id="vraag-foot" data-start="0" data-duration="4.5"><span>NBL Glow &middot; Utrecht</span><div class="pill">@nbl_glow</div></div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+tl.fromTo("#vraag-h", { opacity: 0, y: 26 }, { opacity: 1, y: 0, duration: 0.8, ease: "power3.out" }, 0.1);
+    tl.fromTo("#vraag-s", { opacity: 0, y: 26 }, { opacity: 1, y: 0, duration: 0.8, ease: "power3.out" }, 1.0);
+    window.__timelines["vraag"] = tl;
+  </script>
+</template>

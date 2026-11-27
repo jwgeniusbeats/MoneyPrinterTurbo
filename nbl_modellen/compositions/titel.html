@@ -1,0 +1,27 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; font-family: Inter, sans-serif; overflow: hidden; }
+    #root.dark { background: #221a17; color: #f3ece2; }
+    #root.cream { background: linear-gradient(165deg, #f3ece2 0%, #e8e0d3 100%); color: #221a17; }
+    #root .logo { position: absolute; left: 150px; top: 305px; width: 190px; height: auto; }
+    #root .serif { font-family: 'EB Garamond', serif; font-weight: 400; line-height: 1.06; position: absolute; left: 150px; width: 780px; }
+    #root .rule { position: absolute; left: 150px; width: 90px; height: 2px; background: currentColor; opacity: 0.45; }
+    #root .sans { position: absolute; left: 150px; width: 780px; font-size: 38px; line-height: 1.35; opacity: 0.8; }
+    #root .foot { position: absolute; left: 150px; top: 1180px; width: 780px; display: flex; justify-content: space-between; align-items: center; font-size: 26px; letter-spacing: 0.04em; }
+    #root .foot span { opacity: 0.6; }
+    #root.dark .pill { background: #f3ece2; color: #221a17; } #root.cream .pill { background: #221a17; color: #f3ece2; }
+    #root .pill { font-size: 25px; font-weight: 600; padding: 12px 28px; border-radius: 999px; }
+  </style>
+  <div id="root" class="dark" data-composition-id="titel" data-width="1080" data-height="1920">
+    <img class="logo" src="assets/logo_light.png" />
+    <div class="serif clip" id="titel-h" data-start="0" data-duration="3.5" style="top:520px;font-size:150px">Modellen gezocht</div>
+    <div class="rule" id="titel-rule" style="top:900px"></div>
+    <div class="sans clip" id="titel-s" data-start="0" data-duration="3.5" style="top:935px">Microhaar shading in Utrecht</div>
+    <div class="foot clip" id="titel-foot" data-start="0" data-duration="3.5"><span>NBL Glow &middot; Utrecht</span><div class="pill">@nbl_glow</div></div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    tl.fromTo("#titel-rule", { scaleX: 0, transformOrigin: "0 50%" }, { scaleX: 1, duration: 0.8, ease: "power2.out" }, 0.4);
+    window.__timelines["titel"] = tl;
+  </script>
+</template>
