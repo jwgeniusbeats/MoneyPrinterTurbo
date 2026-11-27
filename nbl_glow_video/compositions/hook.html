@@ -1,0 +1,31 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; background: linear-gradient(170deg, #1b1310 0%, #2a1d17 60%, #1b1310 100%); font-family: Inter, sans-serif; color: #f5ece3; overflow: hidden; }
+    #root .orb { position: absolute; border-radius: 50%; background: radial-gradient(circle, rgba(201,160,116,0.55) 0%, rgba(201,160,116,0.18) 40%, rgba(201,160,116,0) 70%); }
+    #root .eyebrow { font-size: 30px; letter-spacing: 0.22em; font-weight: 700; color: #c9a074; text-transform: uppercase; }
+    #root .serif { font-family: 'Playfair Display', serif; font-weight: 700; line-height: 1.05; }
+    #root .serif em { font-style: italic; color: #d9b186; font-weight: 400; }
+    #root .photo { position: absolute; left: 150px; top: 450px; width: 780px; height: 590px; border-radius: 44px; overflow: hidden; box-shadow: 0 0 90px rgba(201,160,116,0.35), 0 0 0 2px rgba(201,160,116,0.55); }
+    #root .photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    #root .photo .shade { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(27,19,16,0) 60%, rgba(27,19,16,0.55) 100%); }
+    #root .q { position: absolute; left: 150px; top: 1065px; width: 780px; font-size: 88px; }
+    #root .logo { position: absolute; left: 150px; top: 305px; width: 190px; height: auto; }
+  </style>
+  <div id="root" data-composition-id="hook" data-width="1080" data-height="1920">
+    <div class="orb" id="hk-o1" style="left:-200px;top:200px;width:800px;height:800px"></div>
+    <div class="orb" id="hk-o2" style="left:520px;top:1100px;width:700px;height:700px"></div>
+    <img class="logo" id="hk-logo" src="assets/logo_light.png" />
+    <div class="photo" id="hk-photo"><img id="hk-img" src="assets/foto_b.jpg" /><div class="shade"></div></div>
+    <div class="serif q clip" id="hk-q" data-start="0.5" data-duration="3.6">Last van <em>dunner</em> haar?</div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    tl.fromTo("#hk-logo", { opacity: 0 }, { opacity: 1, duration: 0.8 }, 0);
+    tl.fromTo("#hk-photo", { opacity: 0, y: 40 }, { opacity: 1, y: 0, duration: 0.9, ease: "power3.out" }, 0);
+    tl.fromTo("#hk-img", { scale: 1.0, transformOrigin: "50% 40%" }, { scale: 1.12, duration: 4.2, ease: "none" }, 0);
+    tl.fromTo("#hk-o1", { x: 0, y: 0 }, { x: 80, y: 60, duration: 4.2, ease: "none" }, 0);
+    tl.fromTo("#hk-o2", { x: 0, y: 0 }, { x: -60, y: -50, duration: 4.2, ease: "none" }, 0);
+    tl.fromTo("#hk-q", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.8, ease: "power3.out" }, 0.5);
+    window.__timelines["hook"] = tl;
+  </script>
+</template>

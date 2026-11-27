@@ -1,0 +1,35 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; background: linear-gradient(170deg, #1b1310 0%, #2a1d17 60%, #1b1310 100%); font-family: Inter, sans-serif; color: #f5ece3; overflow: hidden; }
+    #root .orb { position: absolute; border-radius: 50%; background: radial-gradient(circle, rgba(201,160,116,0.55) 0%, rgba(201,160,116,0.18) 40%, rgba(201,160,116,0) 70%); }
+    #root .eyebrow { font-size: 30px; letter-spacing: 0.22em; font-weight: 700; color: #c9a074; text-transform: uppercase; }
+    #root .serif { font-family: 'Playfair Display', serif; font-weight: 700; line-height: 1.05; }
+    #root .serif em { font-style: italic; color: #d9b186; font-weight: 400; }
+    #root .logo { position: absolute; left: 150px; top: 320px; width: 220px; height: auto; }
+    #root .h { position: absolute; left: 150px; top: 520px; width: 780px; font-size: 112px; }
+    #root .info { position: absolute; left: 150px; font-size: 48px; color: #f5ece3; }
+    #root #ct-i1 { top: 880px; } #root #ct-i2 { top: 945px; color: #e6d5c4; }
+    #root .pill { position: absolute; left: 150px; top: 1040px; font-size: 52px; font-weight: 700; color: #1b1310; background: #c9a074; padding: 14px 38px; border-radius: 999px; box-shadow: 0 0 60px rgba(201,160,116,0.45); }
+    #root .note { position: absolute; left: 150px; top: 1150px; width: 780px; font-size: 32px; line-height: 1.3; color: #bfae9d; }
+  </style>
+  <div id="root" data-composition-id="cta" data-width="1080" data-height="1920">
+    <div class="orb" id="ct-o1" style="left:150px;top:300px;width:800px;height:800px"></div>
+    <img class="logo" id="ct-logo" src="assets/logo_light.png" />
+    <div class="serif h clip" id="ct-h" data-start="0.3" data-duration="4.2">Boek een gratis <em>intake.</em></div>
+    <div class="info clip" id="ct-i1" data-start="1.1" data-duration="3.4">Zaterdag, alleen op afspraak</div>
+    <div class="info clip" id="ct-i2" data-start="1.5" data-duration="3.0">Overvliet 1, Utrecht</div>
+    <div class="pill clip" id="ct-p" data-start="2.0" data-duration="2.5">haartattoos.com</div>
+    <div class="note clip" id="ct-n" data-start="2.6" data-duration="1.9">Niet iedereen komt in aanmerking. In de intake bespreken we of het bij je past.</div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    tl.fromTo("#ct-o1", { scale: 0.9, opacity: 0.5 }, { scale: 1.15, opacity: 1, duration: 4.5, ease: "sine.inOut" }, 0);
+    tl.fromTo("#ct-logo", { opacity: 0 }, { opacity: 1, duration: 0.7 }, 0);
+    tl.fromTo("#ct-h", { opacity: 0, y: 36 }, { opacity: 1, y: 0, duration: 0.9, ease: "power3.out" }, 0.3);
+    tl.fromTo("#ct-i1", { opacity: 0, y: 18 }, { opacity: 1, y: 0, duration: 0.6 }, 1.1);
+    tl.fromTo("#ct-i2", { opacity: 0, y: 18 }, { opacity: 1, y: 0, duration: 0.6 }, 1.5);
+    tl.fromTo("#ct-p", { opacity: 0, scale: 0.92, transformOrigin: "0 50%" }, { opacity: 1, scale: 1, duration: 0.6, ease: "back.out(1.6)" }, 2.0);
+    tl.fromTo("#ct-n", { opacity: 0 }, { opacity: 1, duration: 0.6 }, 2.6);
+    window.__timelines["cta"] = tl;
+  </script>
+</template>

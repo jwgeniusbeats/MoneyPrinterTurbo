@@ -1,0 +1,26 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; background: linear-gradient(170deg, #1b1310 0%, #2a1d17 60%, #1b1310 100%); font-family: Inter, sans-serif; color: #f5ece3; overflow: hidden; }
+    #root .orb { position: absolute; border-radius: 50%; background: radial-gradient(circle, rgba(201,160,116,0.55) 0%, rgba(201,160,116,0.18) 40%, rgba(201,160,116,0) 70%); }
+    #root .eyebrow { font-size: 30px; letter-spacing: 0.22em; font-weight: 700; color: #c9a074; text-transform: uppercase; }
+    #root .serif { font-family: 'Playfair Display', serif; font-weight: 700; line-height: 1.05; }
+    #root .serif em { font-style: italic; color: #d9b186; font-weight: 400; }
+    #root .fact { position: absolute; left: 150px; width: 780px; border-top: 2px solid rgba(201,160,116,0.7); padding-top: 22px; }
+    #root .fact .lab { font-size: 28px; letter-spacing: 0.2em; text-transform: uppercase; font-weight: 700; color: #c9a074; }
+    #root .fact .txt { font-size: 52px; line-height: 1.18; margin-top: 12px; font-family: 'Playfair Display', serif; font-weight: 400; }
+  </style>
+  <div id="root" data-composition-id="feiten" data-width="1080" data-height="1920">
+    <div class="orb" id="ft-o1" style="left:-300px;top:1000px;width:900px;height:900px"></div>
+    <div class="eyebrow clip" id="ft-eb" data-start="0.2" data-duration="5.8" style="position:absolute;left:150px;top:330px">Zo werkt het</div>
+    <div class="fact clip" id="ft-1" data-start="0.7" data-duration="5.3" style="top:420px"><div class="lab">Wat het is</div><div class="txt">Kleine pigmentpuntjes op de hoofdhuid, zodat dun haar voller oogt.</div></div>
+    <div class="fact clip" id="ft-2" data-start="2.2" data-duration="3.8" style="top:690px"><div class="lab">Wat het niet is</div><div class="txt">Geen haargroei. Een cosmetisch resultaat.</div></div>
+    <div class="fact clip" id="ft-3" data-start="3.7" data-duration="2.3" style="top:960px"><div class="lab">Hoe begin je</div><div class="txt">Met een gratis en vrijblijvende intake.</div></div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    tl.fromTo("#ft-o1", { x: 0 }, { x: 160, duration: 6, ease: "none" }, 0);
+    tl.fromTo("#ft-eb", { opacity: 0 }, { opacity: 1, duration: 0.5 }, 0.2);
+    ["#ft-1", "#ft-2", "#ft-3"].forEach((id, i) => tl.fromTo(id + " .lab, " + id + " .txt", { opacity: 0, y: 28 }, { opacity: 1, y: 0, duration: 0.7, ease: "power3.out", stagger: 0.12 }, 0.7 + i * 1.5));
+    window.__timelines["feiten"] = tl;
+  </script>
+</template>
