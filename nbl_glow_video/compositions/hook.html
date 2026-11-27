@@ -19,14 +19,11 @@
   <div id="root" class="dark" data-composition-id="hook" data-width="1080" data-height="1920">
     <img class="logo" id="hook-logo" src="assets/logo_light.png" />
     <div class="photo" id="hook-photo"><img id="hook-img" src="assets/foto_b.jpg" /><div class="shade"></div></div>
-    <div class="serif q clip" id="hook-q" data-start="0.5" data-duration="2.4">Last van dunner haar?</div>
+    <div class="serif q clip" id="hook-q" data-start="0" data-duration="3.2">Last van dunner haar?</div>
   </div>
   <script>
     const tl = gsap.timeline({ paused: true });
-    tl.fromTo("#hook-logo", { opacity: 0 }, { opacity: 1, duration: 0.7 }, 0);
-    tl.fromTo("#hook-photo", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.8, ease: "power3.out" }, 0);
     tl.fromTo("#hook-img", { scale: 1.0, transformOrigin: "50% 40%" }, { scale: 1.1, duration: 3.2, ease: "none" }, 0);
-    tl.fromTo("#hook-q", { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.8, ease: "power3.out" }, 0.5);
     window.__timelines["hook"] = tl;
   </script>
 </template>
